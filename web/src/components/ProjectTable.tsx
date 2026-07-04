@@ -1,11 +1,19 @@
 import { Fragment, useEffect, useRef } from "react";
 import type { Row } from "../model";
 import type { FleetEvent, SessionState } from "../types";
-import { STATE_CLASS, STATE_ICON, STATE_LABEL, age, clockTime } from "../util";
+import {
+  STATE_CLASS,
+  STATE_ICON,
+  STATE_LABEL,
+  age,
+  clockTime,
+  fmtTokens,
+} from "../util";
 
 interface Props {
   rows: Row[];
   tails: Map<string, FleetEvent[]>;
+  usage: Map<string, { input: number; output: number }>;
   selectedId: string | null;
   now: number;
   filter: string;
@@ -45,6 +53,7 @@ function Detail({ tool, summary }: { tool?: string; summary?: string }) {
 export function ProjectTable({
   rows,
   tails,
+  usage,
   selectedId,
   now,
   filter,
@@ -105,6 +114,8 @@ export function ProjectTable({
               const multi = row.sessions.length > 1;
               const active = st === "working" || st === "needs_input";
               const tail = active ? tails.get(row.name) : undefined;
+              const u = active ? usage.get(row.name) : undefined;
+              const hasUsage = u && (u.input > 0 || u.output > 0);
               return (
                 <Fragment key={row.id}>
                   <div
@@ -133,6 +144,14 @@ export function ProjectTable({
                       {row.lead ? age(row.lead.updated_at, now) : ""}
                     </span>
                   </div>
+                  {hasUsage && u && (
+                    <div className="tail-line usage-tail">
+                      <span className="tail-tree">└</span>
+                      <span className="tail-sum">
+                        {fmtTokens(u.input)} in / {fmtTokens(u.output)} out today
+                      </span>
+                    </div>
+                  )}
                   {tail && tail.length > 0 && <Tail events={tail} />}
                 </Fragment>
               );

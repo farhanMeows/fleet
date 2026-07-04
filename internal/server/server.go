@@ -87,6 +87,7 @@ func (s *Server) Run() error {
 	mux.HandleFunc("DELETE /api/playbooks/{name}", s.handlePlaybookDelete)
 	mux.HandleFunc("POST /api/broadcast", s.handleBroadcast)
 	mux.HandleFunc("GET /api/health", s.handleHealth)
+	mux.HandleFunc("GET /api/claude-window", s.handleClaudeWindow)
 	mux.HandleFunc("GET /api/costs", s.handleCosts)
 	mux.HandleFunc("GET /api/digest", s.handleDigest)
 	mux.HandleFunc("PUT /api/projects/{name}/ports", s.handleSetPorts)
@@ -201,7 +202,46 @@ func (s *Server) collectUsage(sess *store.Session) {
 		log.Printf("usage %s: %v", sess.Project, err)
 		return
 	}
+	s.store.AddUsageTurn(sess.Project, time.Now().Unix(), u.InputTokens, u.OutputTokens)
 	s.store.SetUsageOffset(sess.SessionID, newOffset)
+}
+
+// handleClaudeWindow estimates the current Claude 5-hour usage window: the
+// block starts at the first activity after a ≥5h quiet gap and lasts exactly
+// 5h (mirroring Claude's session-block behavior). Token sums come from
+// usage_turns. FLEET_5H_BUDGET (tokens) optionally provides a bar ceiling.
+func (s *Server) handleClaudeWindow(w http.ResponseWriter, _ *http.Request) {
+	const window = 5 * time.Hour
+	now := time.Now().Unix()
+	times, err := s.store.ActivityTimes(now - 2*24*3600)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var start int64
+	for _, ts := range times {
+		if start == 0 || ts >= start+int64(window.Seconds()) {
+			start = ts
+		}
+	}
+	resp := map[string]any{"active": false}
+	if start > 0 && now < start+int64(window.Seconds()) {
+		in, out, turns := s.store.UsageSinceTS(start)
+		resp = map[string]any{
+			"active":        true,
+			"window_start":  start,
+			"resets_at":     start + int64(window.Seconds()),
+			"input_tokens":  in,
+			"output_tokens": out,
+			"turns":         turns,
+		}
+		if v := os.Getenv("FLEET_5H_BUDGET"); v != "" {
+			if b, err := strconv.ParseInt(v, 10, 64); err == nil && b > 0 {
+				resp["budget"] = b
+			}
+		}
+	}
+	writeJSON(w, resp)
 }
 
 // lastReplySnippet extracts the agent's final message of the turn so

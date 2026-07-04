@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/farhanahmad/fleet/internal/client"
 	"github.com/farhanahmad/fleet/internal/event"
+	"github.com/farhanahmad/fleet/internal/queue"
 	"github.com/farhanahmad/fleet/internal/store"
 	"github.com/farhanahmad/fleet/internal/tmuxdrv"
 )
@@ -50,6 +52,10 @@ type watchRow struct {
 	tail       []string // recent activity lines, shown for active projects
 	tokIn      int64    // today's tokens
 	tokOut     int64
+	branch     string // git branch (+dirty count) from the health prober
+	dirty      int
+	srvUp      int // dev-server ports up / total configured
+	srvTotal   int
 }
 
 type (
@@ -57,6 +63,9 @@ type (
 	dataMsg struct {
 		rows          []watchRow
 		tokIn, tokOut int64 // fleet-wide today
+		events        []store.EventRow
+		queued        []queue.Item
+		window        *client.ClaudeWindow
 	}
 	errMsg   struct{ err error }
 	flashMsg struct {
@@ -75,6 +84,9 @@ type watchModel struct {
 
 	fetchErr      error
 	tokIn, tokOut int64 // fleet-wide today
+	events        []store.EventRow
+	queued        []queue.Item
+	window        *client.ClaudeWindow
 	flash         flashMsg
 	flashAt       time.Time
 
@@ -107,9 +119,12 @@ func fetchRows(c *client.Client) tea.Cmd {
 		if err != nil {
 			return errMsg{err}
 		}
-		// Best-effort extras: activity tails and today's token usage.
+		// Best-effort extras: activity tails, tokens, health, queue, 5h window.
 		events, _ := c.Events(80)
 		usage, _ := c.Costs(1)
+		health, _ := c.Health()
+		queued, _ := c.QueueList("")
+		window, _ := c.ClaudeWindow()
 		rows := buildRows(projects, sessions)
 		attachTails(rows, events)
 		var totIn, totOut int64
@@ -122,8 +137,18 @@ func fetchRows(c *client.Client) tea.Cmd {
 		for i := range rows {
 			rows[i].tokIn = byProject[rows[i].name].InputTokens
 			rows[i].tokOut = byProject[rows[i].name].OutputTokens
+			if h, ok := health[rows[i].name]; ok {
+				rows[i].branch, rows[i].dirty = h.GitBranch, h.GitDirty
+				for _, p := range h.Ports {
+					rows[i].srvTotal++
+					if p.Open {
+						rows[i].srvUp++
+					}
+				}
+			}
 		}
-		return dataMsg{rows: rows, tokIn: totIn, tokOut: totOut}
+		return dataMsg{rows: rows, tokIn: totIn, tokOut: totOut,
+			events: events, queued: queued, window: window}
 	}
 }
 
@@ -213,6 +238,7 @@ func (m watchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dataMsg:
 		m.rows = msg.rows
 		m.tokIn, m.tokOut = msg.tokIn, msg.tokOut
+		m.events, m.queued, m.window = msg.events, msg.queued, msg.window
 		m.fetchErr = nil
 		if m.cursor >= len(m.rows) {
 			m.cursor = len(m.rows) - 1
@@ -324,11 +350,22 @@ func cell(s string, w int) string {
 }
 
 // layout splits the terminal width into column widths. NOW absorbs slack;
-// on narrow terminals NAME shrinks first, then AGE and NOW drop entirely.
-func (m watchModel) layout() (nameW, stateW, nowW, ageW int) {
+// on narrow terminals BRANCH/SRV drop first, then NAME shrinks, then AGE
+// and NOW drop entirely.
+func (m watchModel) layout() (nameW, stateW, branchW, srvW, nowW, ageW int) {
 	nameW, stateW, ageW = 24, 10, 5
-	// indent(2) + icon(2) + gaps(2+2+2)
-	nowW = m.width - nameW - stateW - ageW - 10
+	if m.width >= 110 {
+		branchW, srvW = 16, 5
+	}
+	// indent(2) + icon(2) + inter-column gaps (2 each)
+	gaps := 6
+	if branchW > 0 {
+		gaps += 2
+	}
+	if srvW > 0 {
+		gaps += 2
+	}
+	nowW = m.width - nameW - stateW - branchW - srvW - ageW - 4 - gaps
 	if nowW < 10 {
 		nameW += nowW - 10
 		nowW = 10
@@ -342,10 +379,10 @@ func (m watchModel) layout() (nameW, stateW, nowW, ageW int) {
 	if m.width < nameW+stateW+ageW+8 {
 		ageW = 0
 	}
-	return nameW, stateW, nowW, ageW
+	return nameW, stateW, branchW, srvW, nowW, ageW
 }
 
-func (m watchModel) renderRow(row watchRow, selected bool, nameW, stateW, nowW, ageW int) string {
+func (m watchModel) renderRow(row watchRow, selected bool, nameW, stateW, branchW, srvW, nowW, ageW int) string {
 	now := row.tool
 	if row.summary != "" {
 		now = row.tool + ": " + row.summary
@@ -356,6 +393,22 @@ func (m watchModel) renderRow(row watchRow, selected bool, nameW, stateW, nowW, 
 	b.WriteString(cell(row.name, nameW))
 	b.WriteString("  ")
 	b.WriteString(cell(stateLabel(row.state), stateW))
+	if branchW > 0 {
+		br := row.branch
+		if br != "" && row.dirty > 0 {
+			br += fmt.Sprintf(" ±%d", row.dirty)
+		}
+		b.WriteString("  ")
+		b.WriteString(cell(br, branchW))
+	}
+	if srvW > 0 {
+		srv := ""
+		if row.srvTotal > 0 {
+			srv = fmt.Sprintf("%d/%d↑", row.srvUp, row.srvTotal)
+		}
+		b.WriteString("  ")
+		b.WriteString(cell(srv, srvW))
+	}
 	if nowW > 0 {
 		b.WriteString("  ")
 		b.WriteString(cell(now, nowW))
@@ -375,11 +428,45 @@ func (m watchModel) renderRow(row watchRow, selected bool, nameW, stateW, nowW, 
 	return wsState[row.state].Render(head) + line[len(head):]
 }
 
+// claudeLine renders the estimated 5h usage-window bar with reset countdown.
+func (m watchModel) claudeLine() string {
+	w := m.window
+	if w == nil {
+		return ""
+	}
+	if !w.Active {
+		return wsDim.Render("claude  5h window idle — a new window starts with your next prompt")
+	}
+	until := time.Until(time.Unix(w.ResetsAt, 0)).Round(time.Minute)
+	reset := fmt.Sprintf("resets %s (in %dh%02dm)",
+		time.Unix(w.ResetsAt, 0).Format("15:04"), int(until.Hours()), int(until.Minutes())%60)
+	used := w.InputTokens + w.OutputTokens
+	if w.Budget > 0 {
+		pct := float64(used) / float64(w.Budget)
+		if pct > 1 {
+			pct = 1
+		}
+		const barW = 24
+		filled := int(pct * barW)
+		bar := strings.Repeat("█", filled) + strings.Repeat("░", barW-filled)
+		style := wsOK
+		if pct > 0.8 {
+			style = wsErr
+		} else if pct > 0.5 {
+			style = wsState[event.StateWorking]
+		}
+		return wsDim.Render("claude  ") + style.Render(bar) +
+			wsDim.Render(fmt.Sprintf("  %d%% of %s · %s", int(pct*100), humanTokens(w.Budget), reset))
+	}
+	return wsDim.Render(fmt.Sprintf("claude  5h window: %s in / %s out · %d turns · %s",
+		humanTokens(w.InputTokens), humanTokens(w.OutputTokens), w.Turns, reset))
+}
+
 func (m watchModel) View() string {
 	if m.width == 0 {
 		return ""
 	}
-	nameW, stateW, nowW, ageW := m.layout()
+	nameW, stateW, branchW, srvW, nowW, ageW := m.layout()
 
 	var b strings.Builder
 	header := wsTitle.Render("FLEET") + "  " + wsDim.Render(time.Now().Format("15:04:05"))
@@ -389,9 +476,21 @@ func (m watchModel) View() string {
 	if m.fetchErr != nil {
 		header += "  " + wsErr.Render("⚠ "+m.fetchErr.Error())
 	}
-	b.WriteString(truncLine(header, m.width) + "\n\n")
+	b.WriteString(truncLine(header, m.width) + "\n")
+	headerLines := 3
+	if cl := m.claudeLine(); cl != "" {
+		b.WriteString(truncLine(cl, m.width) + "\n")
+		headerLines++
+	}
+	b.WriteString("\n")
 
 	head := "  " + cell("", 2) + cell("PROJECT", nameW) + "  " + cell("STATE", stateW)
+	if branchW > 0 {
+		head += "  " + cell("BRANCH", branchW)
+	}
+	if srvW > 0 {
+		head += "  " + cell("SRV", srvW)
+	}
 	if nowW > 0 {
 		head += "  " + cell("NOW", nowW)
 	}
@@ -400,9 +499,9 @@ func (m watchModel) View() string {
 	}
 	b.WriteString(wsDim.Render(head) + "\n")
 
-	// Scroll window: keep the cursor visible in the space between the
-	// 3 header lines and the 3 footer lines.
-	visible := m.height - 6
+	// Reserve space for the events panel that fills leftover screen; it
+	// shrinks to nothing when the project list needs the room.
+	visible := m.height - headerLines - 3
 	if visible < 1 {
 		visible = 1
 	}
@@ -425,7 +524,7 @@ func (m watchModel) View() string {
 				break
 			}
 		}
-		b.WriteString(m.renderRow(row, i == m.cursor, nameW, stateW, nowW, ageW) + "\n")
+		b.WriteString(m.renderRow(row, i == m.cursor, nameW, stateW, branchW, srvW, nowW, ageW) + "\n")
 		linesUsed++
 		// Live tail under active rows: today's tokens, then recent activity.
 		if len(row.tail) > 0 && linesUsed < visible {
@@ -445,6 +544,51 @@ func (m watchModel) View() string {
 	}
 	if len(m.rows) == 0 {
 		b.WriteString(wsDim.Render("  no projects registered — fleet add <path>") + "\n")
+	}
+
+	// Queue line: pending work waiting for agents to go idle.
+	if len(m.queued) > 0 && linesUsed+1 < visible {
+		parts := make([]string, 0, len(m.queued))
+		for _, q := range m.queued {
+			parts = append(parts, fmt.Sprintf("%s#%d %s", q.Project, q.ID, clip(q.Prompt, 30)))
+		}
+		b.WriteString(truncLine(wsState[event.StateWorking].Render(fmt.Sprintf("  QUEUE (%d)  ", len(m.queued)))+
+			wsDim.Render(strings.Join(parts, " · ")), m.width) + "\n")
+		linesUsed++
+	}
+
+	// Events feed fills whatever vertical space the table left over.
+	// PostToolUse mirrors PreToolUse and SessionEnd is bookkeeping — skip both.
+	feed := make([]store.EventRow, 0, len(m.events))
+	for _, e := range m.events {
+		if e.Event == event.PostToolUse || e.Event == event.SessionEnd {
+			continue
+		}
+		feed = append(feed, e)
+	}
+	if remaining := visible - linesUsed; remaining >= 3 && len(feed) > 0 {
+		b.WriteString("\n" + wsDim.Render("  ── EVENTS "+strings.Repeat("─", max(0, m.width-13))) + "\n")
+		n := remaining - 2
+		if n > len(feed) {
+			n = len(feed)
+		}
+		for i := n - 1; i >= 0; i-- { // oldest of the slice first
+			e := feed[i]
+			label := e.Event
+			if e.Event == event.PermissionRequest {
+				label = "⚠ PERMISSION"
+			}
+			line := fmt.Sprintf("  %s  %-22s %-14s %s",
+				time.Unix(e.CreatedAt, 0).Format("15:04:05"), clip(e.Project, 22), label, e.Tool)
+			if e.Summary != "" {
+				line += ": " + e.Summary
+			}
+			style := wsDim
+			if e.Event == event.PermissionRequest {
+				style = wsErr
+			}
+			b.WriteString(style.Render(truncLine(line, m.width)) + "\n")
+		}
 	}
 
 	b.WriteString("\n")

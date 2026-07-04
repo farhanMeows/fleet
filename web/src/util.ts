@@ -18,6 +18,22 @@ export function clockTime(sec: number): string {
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+// Terminal-style compact token count: >=1M → 1.2M, >=1k → 45.2k (no decimal
+// once it reads in the hundreds, e.g. 718k), else the raw number.
+export function fmtTokens(n: number): string {
+  const trim = (v: number, d: number) =>
+    parseFloat(v.toFixed(d)).toString();
+  if (n >= 1e6) {
+    const v = n / 1e6;
+    return trim(v, v >= 100 ? 0 : 1) + "M";
+  }
+  if (n >= 1e3) {
+    const v = n / 1e3;
+    return trim(v, v >= 100 ? 0 : 1) + "k";
+  }
+  return String(n);
+}
+
 export const STATE_ICON: Record<SessionState, string> = {
   working: "●", // ●
   needs_input: "⚠", // ⚠

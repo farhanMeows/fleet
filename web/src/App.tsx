@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   dispatch as apiDispatch,
+  fetchCosts,
   fetchEvents,
   fetchInbox,
   fetchProjects,
@@ -14,8 +15,15 @@ import { KeymapOverlay } from "./components/KeymapOverlay";
 import { ProjectTable } from "./components/ProjectTable";
 import { Transcript } from "./components/Transcript";
 import { buildRows } from "./model";
-import type { FleetEvent, InboxItem, Project, Session } from "./types";
+import type {
+  FleetEvent,
+  InboxItem,
+  Project,
+  Session,
+  UsageRow,
+} from "./types";
 import { useStream } from "./useStream";
+import { fmtTokens } from "./util";
 
 interface TranscriptTarget {
   sessionId: string;
@@ -27,6 +35,7 @@ export function App() {
   const [sessions, setSessions] = useState<Record<string, Session>>({});
   const [events, setEvents] = useState<FleetEvent[]>([]);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [usage, setUsage] = useState<UsageRow[]>([]);
 
   const [filter, setFilter] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -54,6 +63,9 @@ export function App() {
   const loadEvents = useCallback(() => {
     fetchEvents(60).then(setEvents).catch(() => {});
   }, []);
+  const loadCosts = useCallback(() => {
+    fetchCosts(1).then(setUsage).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchProjects().then(setProjects).catch(() => {});
@@ -66,7 +78,14 @@ export function App() {
       .catch(() => {});
     loadEvents();
     loadInbox();
-  }, [loadEvents, loadInbox]);
+    loadCosts();
+  }, [loadEvents, loadInbox, loadCosts]);
+
+  // ---- token usage poll (fleet-wide + per-project today) ----
+  useEffect(() => {
+    const id = window.setInterval(loadCosts, 30000);
+    return () => window.clearInterval(id);
+  }, [loadCosts]);
 
   // ---- SSE live stream ----
   const mergeSession = useCallback((s: Session) => {
@@ -111,6 +130,22 @@ export function App() {
     for (const [k, arr] of m) m.set(k, arr.reverse());
     return m;
   }, [events]);
+
+  // Today's token usage: per-project map + fleet-wide totals.
+  const { usageByProject, totalIn, totalOut } = useMemo(() => {
+    const map = new Map<string, { input: number; output: number }>();
+    let ti = 0;
+    let to = 0;
+    for (const u of usage) {
+      map.set(u.project, {
+        input: u.input_tokens,
+        output: u.output_tokens,
+      });
+      ti += u.input_tokens;
+      to += u.output_tokens;
+    }
+    return { usageByProject: map, totalIn: ti, totalOut: to };
+  }, [usage]);
 
   // Keep selection valid as rows change.
   useEffect(() => {
@@ -345,6 +380,11 @@ export function App() {
           </span>
         </span>
         <div className="right">
+          {(totalIn > 0 || totalOut > 0) && (
+            <span className="usage" title="fleet-wide token usage today">
+              today {fmtTokens(totalIn)} in / {fmtTokens(totalOut)} out
+            </span>
+          )}
           <span className={"status " + (connected ? "live" : "offline")}>
             <span className="dot">●</span>
             {connected ? "live" : "offline"}
@@ -371,6 +411,7 @@ export function App() {
           <ProjectTable
             rows={rows}
             tails={tailsByProject}
+            usage={usageByProject}
             selectedId={selectedId}
             now={now}
             filter={filter}

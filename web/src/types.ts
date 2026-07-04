@@ -37,6 +37,16 @@ export interface InboxItem {
   since: number;
 }
 
+export interface UsageRow {
+  project: string;
+  day: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read: number;
+  cache_create: number;
+  turns: number;
+}
+
 export type TranscriptRole = "user" | "assistant" | "tool";
 
 export interface TranscriptEntry {

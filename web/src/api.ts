@@ -4,6 +4,7 @@ import type {
   Project,
   Session,
   TranscriptEntry,
+  UsageRow,
 } from "./types";
 
 async function getJSON<T>(url: string, signal?: AbortSignal): Promise<T> {
@@ -38,6 +39,22 @@ export async function fetchInbox(signal?: AbortSignal): Promise<InboxItem[]> {
   try {
     const d = await getJSON<{ items: InboxItem[] }>("/api/inbox", signal);
     return d.items ?? [];
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("404")) return [];
+    throw e;
+  }
+}
+
+export async function fetchCosts(
+  days = 1,
+  signal?: AbortSignal,
+): Promise<UsageRow[]> {
+  try {
+    const d = await getJSON<{ usage: UsageRow[] }>(
+      `/api/costs?days=${days}`,
+      signal,
+    );
+    return d.usage ?? [];
   } catch (e) {
     if (e instanceof Error && e.message.startsWith("404")) return [];
     throw e;

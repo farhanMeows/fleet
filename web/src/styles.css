@@ -86,6 +86,11 @@ body {
   align-items: center;
   gap: 14px;
 }
+.top-bar .usage {
+  color: var(--dim);
+  font-size: 12px;
+  white-space: nowrap;
+}
 .top-bar .status.live {
   color: var(--green);
 }
@@ -327,6 +332,14 @@ body {
   overflow: hidden;
   font-size: 11px;
   color: var(--dimmer);
+}
+.tail-line .tail-tree {
+  color: var(--panel-border);
+  flex: 0 0 auto;
+  margin-left: -8px;
+}
+.tail-line.usage-tail .tail-sum {
+  color: var(--green-dim);
 }
 .tail-line .tail-ts {
   color: var(--dimmer);

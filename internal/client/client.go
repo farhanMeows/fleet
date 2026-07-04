@@ -210,6 +210,53 @@ func (c *Client) Costs(days int) ([]store.UsageRow, error) {
 	return out.Usage, err
 }
 
+// ClaudeWindow is the estimated current 5-hour usage block.
+type ClaudeWindow struct {
+	Active       bool  `json:"active"`
+	WindowStart  int64 `json:"window_start"`
+	ResetsAt     int64 `json:"resets_at"`
+	InputTokens  int64 `json:"input_tokens"`
+	OutputTokens int64 `json:"output_tokens"`
+	Turns        int64 `json:"turns"`
+	Budget       int64 `json:"budget"`
+}
+
+func (c *Client) ClaudeWindow() (*ClaudeWindow, error) {
+	var out ClaudeWindow
+	if err := c.get("/api/claude-window", &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+type HealthRow struct {
+	Project   string `json:"project"`
+	GitBranch string `json:"git_branch"`
+	GitDirty  int    `json:"git_dirty"`
+	Pm2       []struct {
+		Name   string `json:"name"`
+		Status string `json:"status"`
+	} `json:"pm2"`
+	Ports []struct {
+		Port int  `json:"port"`
+		Open bool `json:"open"`
+	} `json:"ports"`
+}
+
+func (c *Client) Health() (map[string]HealthRow, error) {
+	var out struct {
+		Projects []HealthRow `json:"projects"`
+	}
+	if err := c.get("/api/health", &out); err != nil {
+		return nil, err
+	}
+	m := map[string]HealthRow{}
+	for _, h := range out.Projects {
+		m[h.Project] = h
+	}
+	return m, nil
+}
+
 type DigestRow struct {
 	Project      string `json:"project"`
 	Sessions     int64  `json:"sessions"`

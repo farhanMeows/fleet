@@ -76,6 +76,14 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id, id);
 CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
+CREATE TABLE IF NOT EXISTS usage_turns (
+	id            INTEGER PRIMARY KEY AUTOINCREMENT,
+	project       TEXT NOT NULL,
+	ts            INTEGER NOT NULL,
+	input_tokens  INTEGER NOT NULL DEFAULT 0,
+	output_tokens INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_usage_turns_ts ON usage_turns(ts);
 CREATE TABLE IF NOT EXISTS usage_daily (
 	project      TEXT NOT NULL,
 	day          TEXT NOT NULL,
@@ -191,6 +199,43 @@ func (s *Store) AddUsage(project, day string, input, output, cacheRead, cacheCre
 			turns = turns + excluded.turns`,
 		project, day, input, output, cacheRead, cacheCreate, turns)
 	return err
+}
+
+// AddUsageTurn records one turn's tokens with a timestamp — the source for
+// rolling-window (Claude 5h block) usage estimates.
+func (s *Store) AddUsageTurn(project string, ts, in, out int64) error {
+	_, err := s.db.Exec(
+		`INSERT INTO usage_turns(project, ts, input_tokens, output_tokens) VALUES(?,?,?,?)`,
+		project, ts, in, out)
+	return err
+}
+
+// UsageSinceTS sums turn tokens recorded at or after ts.
+func (s *Store) UsageSinceTS(ts int64) (in, out, turns int64) {
+	s.db.QueryRow(
+		`SELECT COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0), COUNT(*)
+		 FROM usage_turns WHERE ts >= ?`, ts).Scan(&in, &out, &turns)
+	return
+}
+
+// ActivityTimes returns event timestamps (ascending) since the given time —
+// used to locate Claude's 5-hour usage-window boundaries.
+func (s *Store) ActivityTimes(since int64) ([]int64, error) {
+	rows, err := s.db.Query(
+		`SELECT created_at FROM events WHERE created_at >= ? AND event != 'SessionEnd' ORDER BY created_at`, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []int64
+	for rows.Next() {
+		var t int64
+		if err := rows.Scan(&t); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
 }
 
 type UsageRow struct {
