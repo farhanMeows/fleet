@@ -25,6 +25,11 @@ func main() {
 		hookCmd(),
 		daemonCmd(),
 		installCmd(),
+		addCmd(),
+		removeCmd(),
+		listCmd(),
+		upCmd(),
+		statusCmd(),
 	)
 
 	if err := root.Execute(); err != nil {

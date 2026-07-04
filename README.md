@@ -38,10 +38,16 @@ curl -s localhost:7433/api/sessions | jq
 | Command | Purpose |
 |---|---|
 | `fleet install` | Install Claude Code hooks (idempotent, backs up settings) |
-| `fleet daemon` | Run the API + dashboard daemon in the foreground |
+| `fleet add [path] [--name x]` | Register a project (any number of them) |
+| `fleet remove <name>` / `fleet list` | Manage the project registry |
+| `fleet up` | Launch/attach the tmux mission-control session (window 0 = dashboard, one window per project running `claude`, live state icons: ● working ⚠ needs you ✓ idle ○ no session) |
+| `fleet status [--watch]` | Status table of every project + session (watch = live dashboard) |
+| `fleet daemon` | Run the API + dashboard daemon in the foreground (auto-started by other commands) |
 | `fleet hook <event>` | (internal) hook entrypoint called by Claude Code |
 
-Coming per the [PRD](docs/PRD.md) roadmap: `up`, `add/remove/list`, `status --watch`, `dispatch`, `queue`, `playbook`, `broadcast`, `digest`, `jump`, `guard`.
+Inside the tmux session: `prefix+<n>` jumps to a project window, `prefix+g` to the dashboard, `prefix+j` opens the window picker.
+
+Coming per the [PRD](docs/PRD.md) roadmap: `dispatch`, `queue`, `playbook`, `broadcast`, `digest`, `guard`, web dashboard.
 
 ## API
 

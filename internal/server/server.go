@@ -17,6 +17,7 @@ import (
 	"github.com/farhanahmad/fleet/internal/config"
 	"github.com/farhanahmad/fleet/internal/event"
 	"github.com/farhanahmad/fleet/internal/store"
+	"github.com/farhanahmad/fleet/internal/tmuxdrv"
 )
 
 type Server struct {
@@ -39,6 +40,8 @@ func (s *Server) Run() error {
 	mux.HandleFunc("GET /api/sessions", s.handleSessions)
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 	mux.HandleFunc("GET /api/projects", s.handleProjects)
+	mux.HandleFunc("POST /api/projects", s.handleAddProject)
+	mux.HandleFunc("DELETE /api/projects/{name}", s.handleRemoveProject)
 	mux.HandleFunc("GET /api/stream", s.hub.serveSSE)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "ok")
@@ -69,7 +72,40 @@ func (s *Server) apply(ev *event.Event) (*store.Session, error) {
 		return nil, err
 	}
 	s.hub.broadcast("session", sess)
+	// Reflect the project's worst state on its tmux window icon, off the
+	// ingestion path.
+	go func(project string) {
+		state, err := s.store.ProjectState(project)
+		if err == nil {
+			tmuxdrv.SetIcon(project, state)
+		}
+	}(sess.Project)
 	return sess, nil
+}
+
+func (s *Server) handleAddProject(w http.ResponseWriter, r *http.Request) {
+	var in struct{ Name, Path string }
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if in.Name == "" || in.Path == "" {
+		http.Error(w, "name and path required", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.AddProject(in.Name, in.Path); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "added"})
+}
+
+func (s *Server) handleRemoveProject(w http.ResponseWriter, r *http.Request) {
+	if err := s.store.RemoveProject(r.PathValue("name")); err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "removed"})
 }
 
 func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
