@@ -52,9 +52,19 @@ curl -s localhost:7433/api/sessions | jq
 | `fleet playbook run <name> <project>...` | Queue a playbook on one or more projects |
 | `fleet broadcast "<prompt>" --projects a,b` / `--all` | Queue one prompt across many projects |
 
+| `fleet digest [--yesterday]` | Daily standup: sessions/turns/tools/tokens per project |
+| `fleet ports <project> 3000,3001` | Dev-server ports to health-check for a project |
+| `fleet guard add/list/remove/check` | Prod-data guardrail patterns (blocks destructive commands referencing prod hosts) |
+
 Inside the tmux session: `prefix+<n>` jumps to a project window, `prefix+g` to the dashboard, `prefix+j` opens the window picker.
 
-Coming per the [PRD](docs/PRD.md) roadmap: `digest`, `guard`, cost tracking, health panel, hermes remote.
+## Web dashboard
+
+`http://localhost:7433` — terminal-themed, keyboard-first (`j/k` navigate, `Enter` for live transcript, `:` command bar with `dispatch <project>: <prompt>`). Live via SSE; shows the fleet table, a NEEDS YOU inbox, and the event feed. Build with `make web && make build` to refresh the embedded assets.
+
+## Phone access
+
+See [docs/HERMES.md](docs/HERMES.md) — drive fleet from Telegram/WhatsApp via hermes-agent, with permission alerts pushed through the webhook outbox (`~/.fleet/webhooks.txt`). Product direction lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## API
 

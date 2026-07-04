@@ -64,14 +64,14 @@ Single Go binary (`fleet`), no CGO, SQLite at `~/.fleet/fleet.db`:
 ## 7. Rollout phases
 
 1. ✅ Event pipeline (hooks → daemon → SQLite → API) — verified end-to-end 2026-07-04
-2. Registry + tmux mission control (up/status/icons/jump)
-3. Notifications + dispatch
-4. Terminal-themed web dashboard + transcript + attention inbox
-5. Queue + playbooks + broadcast
-6. Cost tracking + digest + health panel
-7. Prod-data guardrail + CLAUDE.md rules
-8. Hermes remote (webhook outbox + docs)
-9. Productization groundwork (goreleaser, brew tap, cloud-sync design)
+2. ✅ Registry + tmux mission control — 8 projects live, icons verified through a real permission cycle
+3. ✅ Notifications + dispatch — incl. needs-input refusal and multi-line bracketed paste
+4. ✅ Terminal-themed web dashboard + transcript + attention inbox — embedded, screenshot-verified
+5. ✅ Queue + playbooks + broadcast — sequential dispatch race fixed (in-flight tracking)
+6. ✅ Cost tracking + digest + health panel — token buckets, git/pm2/port probes
+7. ✅ Prod-data guardrail — verified live (blocked a real session's command); rule in CLAUDE.md files
+8. ✅ Hermes remote — webhook outbox verified against a live receiver; token+bind for Tailscale
+9. ✅ Productization groundwork — docs/ROADMAP.md
 
 ## 8. Risks
 
