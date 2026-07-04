@@ -3,10 +3,12 @@
 package server
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -95,9 +97,38 @@ func (s *Server) Run() error {
 		fmt.Fprintln(w, "ok")
 	})
 
-	addr := fmt.Sprintf("127.0.0.1:%d", s.cfg.Port)
+	addr := fmt.Sprintf("%s:%d", s.cfg.Bind, s.cfg.Port)
 	log.Printf("fleet daemon listening on http://%s", addr)
-	return http.ListenAndServe(addr, mux)
+	return http.ListenAndServe(addr, s.auth(mux))
+}
+
+// auth gates non-loopback requests behind the API token (~/.fleet/token).
+// Loopback callers (hooks, local CLI, local browser) pass untouched, so the
+// daemon stays zero-config until it is deliberately exposed (e.g. Tailscale
+// via FLEET_BIND=0.0.0.0 for phone access through hermes-agent).
+func (s *Server) auth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err == nil {
+			if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+		if s.cfg.Token == "" {
+			http.Error(w, "remote access disabled: create ~/.fleet/token first", http.StatusForbidden)
+			return
+		}
+		got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if got == "" {
+			got = r.URL.Query().Get("token")
+		}
+		if subtle.ConstantTimeCompare([]byte(got), []byte(s.cfg.Token)) != 1 {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
@@ -132,11 +163,18 @@ func (s *Server) react(ev *event.Event, sess *store.Session) {
 	switch ev.Event {
 	case event.PermissionRequest:
 		s.notifier.PermissionNeeded(sess.Project, ev.ToolName, ev.Summary)
+		notify.SendWebhooks(s.cfg.Dir, notify.Alert{
+			Kind: "permission_needed", Project: sess.Project,
+			Tool: ev.ToolName, Summary: ev.Summary, Ts: ev.ReceivedAt,
+		})
 	case event.Stop:
 		lastID := s.store.LastEventID(sess.SessionID)
 		started := s.store.TurnStartedAt(sess.SessionID, lastID)
 		if started > 0 && time.Duration(ev.ReceivedAt-started)*time.Second >= minTurnForDoneAlert {
 			s.notifier.TurnDone(sess.Project)
+			notify.SendWebhooks(s.cfg.Dir, notify.Alert{
+				Kind: "turn_done", Project: sess.Project, Ts: ev.ReceivedAt,
+			})
 		}
 		s.collectUsage(sess)
 		s.dispatchMu.Lock()

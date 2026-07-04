@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 const DefaultPort = 7433
@@ -16,6 +17,8 @@ type Config struct {
 	SpoolDir string // ~/.fleet/spool
 	LogPath  string // ~/.fleet/hook.log
 	Port     int
+	Bind     string // listen address; non-loopback requires the API token
+	Token    string // contents of ~/.fleet/token, if present
 }
 
 func Load() (*Config, error) {
@@ -35,6 +38,13 @@ func Load() (*Config, error) {
 		if p, err := strconv.Atoi(v); err == nil && p > 0 {
 			c.Port = p
 		}
+	}
+	c.Bind = "127.0.0.1"
+	if v := os.Getenv("FLEET_BIND"); v != "" {
+		c.Bind = v
+	}
+	if raw, err := os.ReadFile(filepath.Join(dir, "token")); err == nil {
+		c.Token = strings.TrimSpace(string(raw))
 	}
 	if err := os.MkdirAll(c.SpoolDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create fleet dir: %w", err)
