@@ -66,6 +66,7 @@ type (
 		events        []store.EventRow
 		queued        []queue.Item
 		window        *client.ClaudeWindow
+		results       []client.ResultRow
 	}
 	errMsg   struct{ err error }
 	flashMsg struct {
@@ -87,6 +88,8 @@ type watchModel struct {
 	events        []store.EventRow
 	queued        []queue.Item
 	window        *client.ClaudeWindow
+	results       []client.ResultRow
+	showEvents    bool // bottom panel: false = RESULTS (default), true = raw events
 	flash         flashMsg
 	flashAt       time.Time
 
@@ -125,6 +128,7 @@ func fetchRows(c *client.Client) tea.Cmd {
 		health, _ := c.Health()
 		queued, _ := c.QueueList("")
 		window, _ := c.ClaudeWindow()
+		results, _ := c.Results()
 		rows := buildRows(projects, sessions)
 		attachTails(rows, events)
 		var totIn, totOut int64
@@ -148,7 +152,7 @@ func fetchRows(c *client.Client) tea.Cmd {
 			}
 		}
 		return dataMsg{rows: rows, tokIn: totIn, tokOut: totOut,
-			events: events, queued: queued, window: window}
+			events: events, queued: queued, window: window, results: results}
 	}
 }
 
@@ -239,6 +243,7 @@ func (m watchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rows = msg.rows
 		m.tokIn, m.tokOut = msg.tokIn, msg.tokOut
 		m.events, m.queued, m.window = msg.events, msg.queued, msg.window
+		m.results = msg.results
 		m.fetchErr = nil
 		if m.cursor >= len(m.rows) {
 			m.cursor = len(m.rows) - 1
@@ -286,6 +291,8 @@ func (m watchModel) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "r":
 		return m, fetchRows(m.client)
+	case "e":
+		m.showEvents = !m.showEvents
 	case "enter":
 		if row := m.selected(); row != nil {
 			return m, jumpTo(row.name)
@@ -557,37 +564,14 @@ func (m watchModel) View() string {
 		linesUsed++
 	}
 
-	// Events feed fills whatever vertical space the table left over.
-	// PostToolUse mirrors PreToolUse and SessionEnd is bookkeeping — skip both.
-	feed := make([]store.EventRow, 0, len(m.events))
-	for _, e := range m.events {
-		if e.Event == event.PostToolUse || e.Event == event.SessionEnd {
-			continue
-		}
-		feed = append(feed, e)
-	}
-	if remaining := visible - linesUsed; remaining >= 3 && len(feed) > 0 {
-		b.WriteString("\n" + wsDim.Render("  ── EVENTS "+strings.Repeat("─", max(0, m.width-13))) + "\n")
-		n := remaining - 2
-		if n > len(feed) {
-			n = len(feed)
-		}
-		for i := n - 1; i >= 0; i-- { // oldest of the slice first
-			e := feed[i]
-			label := e.Event
-			if e.Event == event.PermissionRequest {
-				label = "⚠ PERMISSION"
-			}
-			line := fmt.Sprintf("  %s  %-22s %-14s %s",
-				time.Unix(e.CreatedAt, 0).Format("15:04:05"), clip(e.Project, 22), label, e.Tool)
-			if e.Summary != "" {
-				line += ": " + e.Summary
-			}
-			style := wsDim
-			if e.Event == event.PermissionRequest {
-				style = wsErr
-			}
-			b.WriteString(style.Render(truncLine(line, m.width)) + "\n")
+	// Bottom panel fills whatever vertical space the table left over:
+	// RESULTS (each agent's latest reply — the useful view) by default,
+	// raw EVENTS behind the `e` toggle.
+	if remaining := visible - linesUsed; remaining >= 3 {
+		if m.showEvents {
+			m.renderEvents(&b, remaining)
+		} else {
+			m.renderResults(&b, remaining)
 		}
 	}
 
@@ -609,9 +593,96 @@ func (m watchModel) View() string {
 		}
 		b.WriteString(truncLine("  dispatch → "+wsTitle.Render(name)+": "+m.input.View(), m.width))
 	} else {
-		b.WriteString(truncLine(wsDim.Render("  ↑/↓ move · enter jump · d dispatch · r refresh · q quit"), m.width))
+		b.WriteString(truncLine(wsDim.Render("  ↑/↓ move · enter jump · d dispatch · e results/events · r refresh · q quit"), m.width))
 	}
 	return b.String()
+}
+
+// renderResults shows each project's most recent agent reply — a glanceable
+// "what has my fleet delivered lately" review.
+func (m watchModel) renderResults(b *strings.Builder, budget int) {
+	if len(m.results) == 0 {
+		return
+	}
+	b.WriteString("\n" + wsDim.Render("  ── LAST RESULTS "+strings.Repeat("─", max(0, m.width-19))) + "\n")
+	lines := 2
+	for _, r := range m.results {
+		if lines+2 > budget {
+			break
+		}
+		b.WriteString("  " + wsOK.Render(r.Project) + wsDim.Render("  ·  "+humanAge(r.UpdatedAt)+" ago") + "\n")
+		lines++
+		snippet := strings.Join(strings.Fields(r.Snippet), " ") // collapse newlines
+		for _, ln := range wrap(snippet, m.width-6, 2) {
+			if lines >= budget {
+				break
+			}
+			b.WriteString("    " + ln + "\n")
+			lines++
+		}
+	}
+}
+
+// renderEvents is the raw hook-event feed (toggle: e). PostToolUse mirrors
+// PreToolUse and SessionEnd is bookkeeping — both skipped.
+func (m watchModel) renderEvents(b *strings.Builder, budget int) {
+	feed := make([]store.EventRow, 0, len(m.events))
+	for _, e := range m.events {
+		if e.Event == event.PostToolUse || e.Event == event.SessionEnd {
+			continue
+		}
+		feed = append(feed, e)
+	}
+	if len(feed) == 0 {
+		return
+	}
+	b.WriteString("\n" + wsDim.Render("  ── EVENTS "+strings.Repeat("─", max(0, m.width-13))) + "\n")
+	n := budget - 2
+	if n > len(feed) {
+		n = len(feed)
+	}
+	for i := n - 1; i >= 0; i-- { // oldest of the slice first
+		e := feed[i]
+		label := e.Event
+		if e.Event == event.PermissionRequest {
+			label = "⚠ PERMISSION"
+		}
+		line := fmt.Sprintf("  %s  %-22s %-14s %s",
+			time.Unix(e.CreatedAt, 0).Format("15:04:05"), clip(e.Project, 22), label, e.Tool)
+		if e.Summary != "" {
+			line += ": " + e.Summary
+		}
+		style := wsDim
+		if e.Event == event.PermissionRequest {
+			style = wsErr
+		}
+		b.WriteString(style.Render(truncLine(line, m.width)) + "\n")
+	}
+}
+
+// wrap splits s into at most maxLines lines of w display columns.
+func wrap(s string, w, maxLines int) []string {
+	if w < 10 {
+		w = 10
+	}
+	var out []string
+	for len(s) > 0 && len(out) < maxLines {
+		if runewidth.StringWidth(s) <= w {
+			out = append(out, s)
+			break
+		}
+		cut := runewidth.Truncate(s, w, "")
+		if i := strings.LastIndex(cut, " "); i > w/2 {
+			cut = cut[:i]
+		}
+		if len(out) == maxLines-1 {
+			out = append(out, runewidth.Truncate(s, w, "…"))
+			break
+		}
+		out = append(out, cut)
+		s = strings.TrimSpace(s[len(cut):])
+	}
+	return out
 }
 
 // truncLine truncates a possibly-styled line to w display columns.

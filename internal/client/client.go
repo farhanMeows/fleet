@@ -229,6 +229,21 @@ func (c *Client) ClaudeWindow() (*ClaudeWindow, error) {
 	return &out, nil
 }
 
+type ResultRow struct {
+	Project   string `json:"project"`
+	Snippet   string `json:"snippet"`
+	UpdatedAt int64  `json:"updated_at"`
+}
+
+// Results returns each project's most recent agent reply, newest first.
+func (c *Client) Results() ([]ResultRow, error) {
+	var out struct {
+		Results []ResultRow `json:"results"`
+	}
+	err := c.get("/api/results", &out)
+	return out.Results, err
+}
+
 type HealthRow struct {
 	Project   string `json:"project"`
 	GitBranch string `json:"git_branch"`

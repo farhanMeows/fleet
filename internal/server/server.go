@@ -37,6 +37,9 @@ type Server struct {
 	queue    *queue.Queue
 	prober   *health.Prober
 
+	snippetMu    sync.Mutex
+	snippetCache map[string]snippetEntry
+
 	dispatchMu sync.Mutex // serializes queue dispatches across projects
 	// inFlight marks projects with a queue-dispatched prompt whose turn has
 	// not ended yet. Session state alone can't tell (a turn with no tool use
@@ -59,7 +62,13 @@ func New(cfg *config.Config, st *store.Store) (*Server, error) {
 	return &Server{
 		cfg: cfg, store: st, hub: newHub(), notifier: notify.New(cfg.Dir),
 		queue: q, prober: health.NewProber(st), inFlight: map[string]time.Time{},
+		snippetCache: map[string]snippetEntry{},
 	}, nil
+}
+
+type snippetEntry struct {
+	mtime   int64
+	snippet string
 }
 
 // Run drains the spool, then serves until the process exits.
@@ -88,6 +97,7 @@ func (s *Server) Run() error {
 	mux.HandleFunc("POST /api/broadcast", s.handleBroadcast)
 	mux.HandleFunc("GET /api/health", s.handleHealth)
 	mux.HandleFunc("GET /api/claude-window", s.handleClaudeWindow)
+	mux.HandleFunc("GET /api/results", s.handleResults)
 	mux.HandleFunc("GET /api/costs", s.handleCosts)
 	mux.HandleFunc("GET /api/digest", s.handleDigest)
 	mux.HandleFunc("PUT /api/projects/{name}/ports", s.handleSetPorts)
@@ -242,6 +252,63 @@ func (s *Server) handleClaudeWindow(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 	writeJSON(w, resp)
+}
+
+// handleResults returns each project's most recent agent reply — the "what
+// has my fleet done lately" view. Transcript reads are cached by mtime.
+func (s *Server) handleResults(w http.ResponseWriter, _ *http.Request) {
+	sessions, err := s.store.ListSessions(false)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	latest := map[string]*store.Session{}
+	for i := range sessions {
+		sess := &sessions[i]
+		if sess.TranscriptPath == "" {
+			continue
+		}
+		if cur, ok := latest[sess.Project]; !ok || sess.UpdatedAt > cur.UpdatedAt {
+			latest[sess.Project] = sess
+		}
+	}
+	type resultRow struct {
+		Project   string `json:"project"`
+		Snippet   string `json:"snippet"`
+		UpdatedAt int64  `json:"updated_at"`
+	}
+	results := []resultRow{}
+	for _, sess := range latest {
+		if snippet := s.cachedReplySnippet(sess.TranscriptPath); snippet != "" {
+			results = append(results, resultRow{Project: sess.Project, Snippet: snippet, UpdatedAt: sess.UpdatedAt})
+		}
+	}
+	sort.Slice(results, func(i, j int) bool { return results[i].UpdatedAt > results[j].UpdatedAt })
+	if len(results) > 12 {
+		results = results[:12]
+	}
+	writeJSON(w, map[string]any{"results": results})
+}
+
+// cachedReplySnippet is lastReplySnippet with an mtime cache, so the
+// dashboard's 2s poll doesn't re-read every transcript each tick.
+func (s *Server) cachedReplySnippet(path string) string {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return ""
+	}
+	mtime := fi.ModTime().Unix()
+	s.snippetMu.Lock()
+	if c, ok := s.snippetCache[path]; ok && c.mtime == mtime {
+		s.snippetMu.Unlock()
+		return c.snippet
+	}
+	s.snippetMu.Unlock()
+	snippet := lastReplySnippet(path)
+	s.snippetMu.Lock()
+	s.snippetCache[path] = snippetEntry{mtime: mtime, snippet: snippet}
+	s.snippetMu.Unlock()
+	return snippet
 }
 
 // lastReplySnippet extracts the agent's final message of the turn so
