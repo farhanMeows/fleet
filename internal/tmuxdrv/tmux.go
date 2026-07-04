@@ -44,6 +44,9 @@ func Up(projects []store.Project, fleetBin string) error {
 			return fmt.Errorf("create session: %w", err)
 		}
 		tmux("set-option", "-t", SessionName, "-g", "allow-rename", "off")
+		// Mouse mode: click a window name in the status bar to switch —
+		// friendlier than prefix keys for tmux newcomers.
+		tmux("set-option", "-g", "mouse", "on")
 		// Hotkeys: prefix+g = dashboard, prefix+j = window picker.
 		tmux("bind-key", "g", "select-window", "-t", SessionName+":0")
 		tmux("bind-key", "j", "choose-tree", "-Zw")
