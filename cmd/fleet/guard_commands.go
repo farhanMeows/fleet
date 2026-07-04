@@ -140,8 +140,8 @@ func runGuardHook(stdin io.Reader) {
 	}
 	if v := guard.Check(input.Command, patterns); v.Blocked {
 		fmt.Fprintf(os.Stderr,
-			"fleet guard: BLOCKED — this command combines a production reference (%q) with a destructive operation (%q). "+
-				"Rule: never update or delete production data; do the work against dev and roll out to prod only after explicit human confirmation.",
+			"fleet guard: BLOCKED — this command combines a production reference (%q) with a write operation (%q). "+
+				"Rule: production is READ-ONLY. Reads (SELECT, pg_dump, GET) are fine; do writes against dev and roll out to prod only after explicit human confirmation.",
 			v.Pattern, v.Verb)
 		os.Exit(2)
 	}

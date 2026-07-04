@@ -14,11 +14,12 @@ import (
 	"strings"
 )
 
-// destructive matches operations that can lose or corrupt data. A command is
-// only blocked when BOTH a prod pattern AND a destructive verb appear, so
-// day-to-day dev work (localhost SQL, force pushes to feature branches on a
-// dev remote) is unaffected unless it references prod.
-var destructive = regexp.MustCompile(`(?i)\b(drop|truncate|delete|update|alter)\b|--force|flushall|dropdatabase|db\.drop`)
+// destructive matches WRITE operations against a database. Policy: prod is
+// read-only — SELECT/pg_dump/GET against prod pass, anything that mutates is
+// blocked. A command is only blocked when BOTH a prod pattern AND a write
+// verb appear, so day-to-day dev work (localhost SQL, force pushes to
+// feature branches) is unaffected unless it references prod.
+var destructive = regexp.MustCompile(`(?i)\b(drop|truncate|delete|update|alter|insert|create|grant|revoke|merge|replace|upsert|copy|vacuum|reindex|set|del|hset|lpush|rpush|sadd|incr|decr|expire|persist|rename)\b|--force|flushall|flushdb|dropdatabase|db\.drop|insertone|insertmany|updateone|updatemany|deleteone|deletemany|findandmodify|bulkwrite`)
 
 const PatternsFile = "guard-patterns.txt"
 
