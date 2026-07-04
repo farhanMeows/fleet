@@ -34,6 +34,8 @@ func main() {
 		queueCmd(),
 		playbookCmd(),
 		broadcastCmd(),
+		digestCmd(),
+		portsCmd(),
 	)
 
 	if err := root.Execute(); err != nil {

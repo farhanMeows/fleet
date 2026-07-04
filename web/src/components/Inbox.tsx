@@ -23,9 +23,8 @@ export function Inbox({ items, now, onPick }: Props) {
         )}
         {sorted.map((it, i) => {
           const label =
-            it.kind === "permission"
-              ? it.summary
-              : `finished, review${it.summary ? " · " + it.summary : ""}`;
+            it.summary ||
+            (it.kind === "permission" ? "permission needed" : "finished, review");
           return (
             <div
               key={it.session_id + i}

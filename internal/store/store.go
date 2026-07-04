@@ -20,6 +20,7 @@ type Store struct {
 type Project struct {
 	Name      string `json:"name"`
 	Path      string `json:"path"`
+	Ports     string `json:"ports,omitempty"` // comma-separated dev-server ports to health-check
 	CreatedAt int64  `json:"created_at"`
 }
 
@@ -75,7 +76,23 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id, id);
 CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
+CREATE TABLE IF NOT EXISTS usage_daily (
+	project      TEXT NOT NULL,
+	day          TEXT NOT NULL,
+	input_tokens  INTEGER NOT NULL DEFAULT 0,
+	output_tokens INTEGER NOT NULL DEFAULT 0,
+	cache_read    INTEGER NOT NULL DEFAULT 0,
+	cache_create  INTEGER NOT NULL DEFAULT 0,
+	turns         INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (project, day)
+);
 `
+
+// idempotent column additions for databases created by earlier versions
+var migrations = []string{
+	`ALTER TABLE projects ADD COLUMN ports TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE sessions ADD COLUMN usage_offset INTEGER NOT NULL DEFAULT 0`,
+}
 
 func Open(dbPath string) (*Store, error) {
 	db, err := sql.Open("sqlite", dbPath+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
@@ -87,6 +104,9 @@ func Open(dbPath string) (*Store, error) {
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
+	}
+	for _, m := range migrations {
+		db.Exec(m) // "duplicate column" on already-migrated databases is fine
 	}
 	return &Store{db: db}, nil
 }
@@ -117,7 +137,7 @@ func (s *Store) RemoveProject(name string) error {
 }
 
 func (s *Store) ListProjects() ([]Project, error) {
-	rows, err := s.db.Query(`SELECT name, path, created_at FROM projects ORDER BY name`)
+	rows, err := s.db.Query(`SELECT name, path, ports, created_at FROM projects ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -125,10 +145,111 @@ func (s *Store) ListProjects() ([]Project, error) {
 	var out []Project
 	for rows.Next() {
 		var p Project
-		if err := rows.Scan(&p.Name, &p.Path, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.Name, &p.Path, &p.Ports, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) SetProjectPorts(name, ports string) error {
+	res, err := s.db.Exec(`UPDATE projects SET ports = ? WHERE name = ?`, ports, name)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("no project named %q", name)
+	}
+	return nil
+}
+
+// --- token usage ---
+
+// UsageOffset returns the transcript byte offset already accounted for.
+func (s *Store) UsageOffset(sessionID string) int64 {
+	var off int64
+	s.db.QueryRow(`SELECT usage_offset FROM sessions WHERE session_id = ?`, sessionID).Scan(&off)
+	return off
+}
+
+func (s *Store) SetUsageOffset(sessionID string, offset int64) error {
+	_, err := s.db.Exec(`UPDATE sessions SET usage_offset = ? WHERE session_id = ?`, offset, sessionID)
+	return err
+}
+
+// AddUsage accumulates token usage into the project's daily bucket.
+func (s *Store) AddUsage(project, day string, input, output, cacheRead, cacheCreate, turns int64) error {
+	_, err := s.db.Exec(`
+		INSERT INTO usage_daily(project, day, input_tokens, output_tokens, cache_read, cache_create, turns)
+		VALUES(?,?,?,?,?,?,?)
+		ON CONFLICT(project, day) DO UPDATE SET
+			input_tokens = input_tokens + excluded.input_tokens,
+			output_tokens = output_tokens + excluded.output_tokens,
+			cache_read = cache_read + excluded.cache_read,
+			cache_create = cache_create + excluded.cache_create,
+			turns = turns + excluded.turns`,
+		project, day, input, output, cacheRead, cacheCreate, turns)
+	return err
+}
+
+type UsageRow struct {
+	Project      string `json:"project"`
+	Day          string `json:"day"`
+	InputTokens  int64  `json:"input_tokens"`
+	OutputTokens int64  `json:"output_tokens"`
+	CacheRead    int64  `json:"cache_read"`
+	CacheCreate  int64  `json:"cache_create"`
+	Turns        int64  `json:"turns"`
+}
+
+// UsageSince returns daily usage rows for days >= fromDay (YYYY-MM-DD).
+func (s *Store) UsageSince(fromDay string) ([]UsageRow, error) {
+	rows, err := s.db.Query(`
+		SELECT project, day, input_tokens, output_tokens, cache_read, cache_create, turns
+		FROM usage_daily WHERE day >= ? ORDER BY day DESC, project`, fromDay)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []UsageRow
+	for rows.Next() {
+		var r UsageRow
+		if err := rows.Scan(&r.Project, &r.Day, &r.InputTokens, &r.OutputTokens, &r.CacheRead, &r.CacheCreate, &r.Turns); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// DayActivity summarizes a project's events for one day (unix range).
+type DayActivity struct {
+	Project    string `json:"project"`
+	Sessions   int64  `json:"sessions"`
+	Turns      int64  `json:"turns"`
+	ToolEvents int64  `json:"tool_events"`
+}
+
+func (s *Store) ActivityBetween(from, to int64) ([]DayActivity, error) {
+	rows, err := s.db.Query(`
+		SELECT project,
+		       COUNT(DISTINCT session_id),
+		       SUM(CASE WHEN event = 'Stop' THEN 1 ELSE 0 END),
+		       SUM(CASE WHEN event = 'PreToolUse' THEN 1 ELSE 0 END)
+		FROM events WHERE created_at >= ? AND created_at < ?
+		GROUP BY project ORDER BY project`, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []DayActivity
+	for rows.Next() {
+		var a DayActivity
+		if err := rows.Scan(&a.Project, &a.Sessions, &a.Turns, &a.ToolEvents); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
 	}
 	return out, rows.Err()
 }

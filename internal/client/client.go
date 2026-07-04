@@ -191,6 +191,32 @@ func (c *Client) PlaybookDelete(name string) error {
 	return c.send(http.MethodDelete, "/api/playbooks/"+name, nil)
 }
 
+type DigestRow struct {
+	Project      string `json:"project"`
+	Sessions     int64  `json:"sessions"`
+	Turns        int64  `json:"turns"`
+	ToolEvents   int64  `json:"tool_events"`
+	InputTokens  int64  `json:"input_tokens"`
+	OutputTokens int64  `json:"output_tokens"`
+}
+
+type Digest struct {
+	Day      string      `json:"day"`
+	Projects []DigestRow `json:"projects"`
+}
+
+func (c *Client) Digest(day string) (*Digest, error) {
+	var out Digest
+	if err := c.get("/api/digest?day="+url.QueryEscape(day), &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *Client) SetPorts(project, ports string) error {
+	return c.send(http.MethodPut, "/api/projects/"+project+"/ports", map[string]string{"ports": ports})
+}
+
 func (c *Client) Broadcast(prompt, playbook string, projects []string, all bool) ([]string, error) {
 	raw, err := json.Marshal(map[string]any{
 		"prompt": prompt, "playbook": playbook, "projects": projects, "all": all,

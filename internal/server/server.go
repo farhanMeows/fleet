@@ -18,6 +18,7 @@ import (
 
 	"github.com/farhanahmad/fleet/internal/config"
 	"github.com/farhanahmad/fleet/internal/event"
+	"github.com/farhanahmad/fleet/internal/health"
 	"github.com/farhanahmad/fleet/internal/notify"
 	"github.com/farhanahmad/fleet/internal/queue"
 	"github.com/farhanahmad/fleet/internal/store"
@@ -32,6 +33,7 @@ type Server struct {
 	hub      *hub
 	notifier *notify.Notifier
 	queue    *queue.Queue
+	prober   *health.Prober
 
 	dispatchMu sync.Mutex // serializes queue dispatches across projects
 	// inFlight marks projects with a queue-dispatched prompt whose turn has
@@ -54,7 +56,7 @@ func New(cfg *config.Config, st *store.Store) (*Server, error) {
 	}
 	return &Server{
 		cfg: cfg, store: st, hub: newHub(), notifier: notify.New(cfg.Dir),
-		queue: q, inFlight: map[string]time.Time{},
+		queue: q, prober: health.NewProber(st), inFlight: map[string]time.Time{},
 	}, nil
 }
 
@@ -62,6 +64,7 @@ func New(cfg *config.Config, st *store.Store) (*Server, error) {
 func (s *Server) Run() error {
 	s.drainSpool()
 	go s.watchSpool()
+	go s.prober.Run(30 * time.Second)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/hook", s.handleHook)
@@ -80,6 +83,10 @@ func (s *Server) Run() error {
 	mux.HandleFunc("POST /api/playbooks", s.handlePlaybookSave)
 	mux.HandleFunc("DELETE /api/playbooks/{name}", s.handlePlaybookDelete)
 	mux.HandleFunc("POST /api/broadcast", s.handleBroadcast)
+	mux.HandleFunc("GET /api/health", s.handleHealth)
+	mux.HandleFunc("GET /api/costs", s.handleCosts)
+	mux.HandleFunc("GET /api/digest", s.handleDigest)
+	mux.HandleFunc("PUT /api/projects/{name}/ports", s.handleSetPorts)
 	if webFS, err := webdist.FS(); err == nil {
 		mux.Handle("GET /", spaHandler(webFS))
 	}
@@ -131,11 +138,30 @@ func (s *Server) react(ev *event.Event, sess *store.Session) {
 		if started > 0 && time.Duration(ev.ReceivedAt-started)*time.Second >= minTurnForDoneAlert {
 			s.notifier.TurnDone(sess.Project)
 		}
+		s.collectUsage(sess)
 		s.dispatchMu.Lock()
 		delete(s.inFlight, sess.Project)
 		s.dispatchMu.Unlock()
 		s.runQueue(sess.Project)
 	}
+}
+
+// collectUsage folds the turn's token usage into the project's daily bucket.
+func (s *Server) collectUsage(sess *store.Session) {
+	if sess.TranscriptPath == "" {
+		return
+	}
+	offset := s.store.UsageOffset(sess.SessionID)
+	u, newOffset, err := transcript.TailUsage(sess.TranscriptPath, offset)
+	if err != nil || newOffset == offset {
+		return
+	}
+	day := time.Now().Format("2006-01-02")
+	if err := s.store.AddUsage(sess.Project, day, u.InputTokens, u.OutputTokens, u.CacheRead, u.CacheCreate, u.Turns); err != nil {
+		log.Printf("usage %s: %v", sess.Project, err)
+		return
+	}
+	s.store.SetUsageOffset(sess.SessionID, newOffset)
 }
 
 // runQueue dispatches the next queued prompt for a project that just went
@@ -470,6 +496,81 @@ func (s *Server) handleBroadcast(w http.ResponseWriter, r *http.Request) {
 		go s.runQueue(p)
 	}
 	writeJSON(w, map[string]any{"status": "queued", "projects": queued})
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, map[string]any{"projects": s.prober.Results()})
+}
+
+func (s *Server) handleCosts(w http.ResponseWriter, r *http.Request) {
+	days := 7
+	if v := r.URL.Query().Get("days"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 90 {
+			days = n
+		}
+	}
+	from := time.Now().AddDate(0, 0, -(days - 1)).Format("2006-01-02")
+	rows, err := s.store.UsageSince(from)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if rows == nil {
+		rows = []store.UsageRow{}
+	}
+	writeJSON(w, map[string]any{"usage": rows})
+}
+
+func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
+	day := time.Now().Format("2006-01-02")
+	if v := r.URL.Query().Get("day"); v != "" {
+		if _, err := time.Parse("2006-01-02", v); err != nil {
+			http.Error(w, "day must be YYYY-MM-DD", http.StatusBadRequest)
+			return
+		}
+		day = v
+	}
+	start, _ := time.ParseInLocation("2006-01-02", day, time.Local)
+	activity, err := s.store.ActivityBetween(start.Unix(), start.AddDate(0, 0, 1).Unix())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	usage, err := s.store.UsageSince(day)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	usageByProject := map[string]store.UsageRow{}
+	for _, u := range usage {
+		if u.Day == day {
+			usageByProject[u.Project] = u
+		}
+	}
+	type digestRow struct {
+		store.DayActivity
+		OutputTokens int64 `json:"output_tokens"`
+		InputTokens  int64 `json:"input_tokens"`
+	}
+	rows := []digestRow{}
+	for _, a := range activity {
+		u := usageByProject[a.Project]
+		rows = append(rows, digestRow{DayActivity: a, OutputTokens: u.OutputTokens, InputTokens: u.InputTokens})
+	}
+	writeJSON(w, map[string]any{"day": day, "projects": rows})
+}
+
+func (s *Server) handleSetPorts(w http.ResponseWriter, r *http.Request) {
+	var in struct{ Ports string }
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := s.store.SetProjectPorts(r.PathValue("name"), in.Ports); err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "updated"})
 }
 
 // spaHandler serves the embedded dashboard, falling back to index.html for
