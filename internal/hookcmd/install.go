@@ -66,7 +66,20 @@ func Install() error {
 				kept = append(kept, e)
 			}
 		}
-		hooks[ev] = append(kept, any(entry))
+		entries := []any{}
+		// The prod-data guard runs first on Bash calls; it is the only fleet
+		// hook that may deny (exit 2).
+		if ev == "PreToolUse" {
+			entries = append(entries, map[string]any{
+				"matcher": "Bash",
+				"hooks": []any{map[string]any{
+					"type":    "command",
+					"command": bin + " guard",
+				}},
+			})
+		}
+		entries = append(entries, entry)
+		hooks[ev] = append(kept, entries...)
 	}
 	settings["hooks"] = hooks
 
@@ -106,12 +119,13 @@ func isFleetEntry(e any) bool {
 }
 
 func isFleetHookCommand(cmd string) bool {
-	// Matches "<anything>/fleet hook <Event>" regardless of install location.
+	// Matches "<anything>/fleet hook <Event>" and "<anything>/fleet guard"
+	// regardless of install location.
 	if cmd == "" {
 		return false
 	}
 	base := filepath.Base(firstField(cmd))
-	return base == "fleet" && containsWord(cmd, "hook")
+	return base == "fleet" && (containsWord(cmd, "hook") || containsWord(cmd, "guard"))
 }
 
 func firstField(s string) string {

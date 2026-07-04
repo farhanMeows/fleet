@@ -36,6 +36,7 @@ func main() {
 		broadcastCmd(),
 		digestCmd(),
 		portsCmd(),
+		guardCmd(),
 	)
 
 	if err := root.Execute(); err != nil {
