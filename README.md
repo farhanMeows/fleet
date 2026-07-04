@@ -41,7 +41,7 @@ curl -s localhost:7433/api/sessions | jq
 | `fleet add [path] [--name x]` | Register a project (any number of them) |
 | `fleet remove <name>` / `fleet list` | Manage the project registry |
 | `fleet up` | Launch/attach the tmux mission-control session (window 0 = dashboard, one window per project running `claude`, live state icons: ● working ⚠ needs you ✓ idle ○ no session) |
-| `fleet status [--watch]` | Status table of every project + session (watch = live dashboard) |
+| `fleet status [--watch]` | Status table of every project + session (watch = interactive dashboard: `j/k` move, `Enter` jump to the project's tmux window, `d` dispatch a prompt, `r` refresh, `q` quit) |
 | `fleet daemon` | Run the API + dashboard daemon in the foreground (auto-started by other commands) |
 | `fleet hook <event>` | (internal) hook entrypoint called by Claude Code |
 

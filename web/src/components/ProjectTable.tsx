@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import type { Row } from "../model";
-import type { SessionState } from "../types";
-import { STATE_CLASS, STATE_ICON, STATE_LABEL, age } from "../util";
+import type { FleetEvent, SessionState } from "../types";
+import { STATE_CLASS, STATE_ICON, STATE_LABEL, age, clockTime } from "../util";
 
 interface Props {
   rows: Row[];
+  tails: Map<string, FleetEvent[]>;
   selectedId: string | null;
   now: number;
   filter: string;
@@ -12,6 +13,22 @@ interface Props {
   filterRef: React.RefObject<HTMLInputElement>;
   onSelect: (id: string) => void;
   onActivate: (id: string) => void;
+}
+
+// Live activity tail: recent events shown dim, indented under an active row.
+function Tail({ events }: { events: FleetEvent[] }) {
+  return (
+    <>
+      {events.map((e) => (
+        <div className="tail-line" key={e.id}>
+          <span className="tail-ts">{clockTime(e.created_at)}</span>
+          {e.tool && <span className="tail-tool">{e.tool}</span>}
+          {e.tool && e.summary ? ": " : ""}
+          <span className="tail-sum">{e.summary}</span>
+        </div>
+      ))}
+    </>
+  );
 }
 
 function Detail({ tool, summary }: { tool?: string; summary?: string }) {
@@ -27,6 +44,7 @@ function Detail({ tool, summary }: { tool?: string; summary?: string }) {
 
 export function ProjectTable({
   rows,
+  tails,
   selectedId,
   now,
   filter,
@@ -85,31 +103,38 @@ export function ProjectTable({
                 st === "none" ? "NO SESSION" : STATE_LABEL[st as SessionState];
               const isSel = selectedId === row.id;
               const multi = row.sessions.length > 1;
+              const active = st === "working" || st === "needs_input";
+              const tail = active ? tails.get(row.name) : undefined;
               return (
-                <div
-                  key={row.id}
-                  data-rowid={row.id}
-                  className={
-                    "row" +
-                    (isSel ? " sel" : "") +
-                    (st === "needs_input" ? " needs" : "")
-                  }
-                  onClick={() => onSelect(row.id)}
-                  onDoubleClick={() => onActivate(row.id)}
-                >
-                  <span className={"icon " + iconCls}>{icon}</span>
-                  <span className="name">
-                    {row.name}
-                    {multi ? ` (${row.sessions.length})` : ""}
-                  </span>
-                  <span className={"state " + iconCls}>{label}</span>
-                  <span className="detail">
-                    <Detail tool={row.lead?.tool} summary={row.lead?.summary} />
-                  </span>
-                  <span className="age">
-                    {row.lead ? age(row.lead.updated_at, now) : ""}
-                  </span>
-                </div>
+                <Fragment key={row.id}>
+                  <div
+                    data-rowid={row.id}
+                    className={
+                      "row" +
+                      (isSel ? " sel" : "") +
+                      (st === "needs_input" ? " needs" : "")
+                    }
+                    onClick={() => onSelect(row.id)}
+                    onDoubleClick={() => onActivate(row.id)}
+                  >
+                    <span className={"icon " + iconCls}>{icon}</span>
+                    <span className="name">
+                      {row.name}
+                      {multi ? ` (${row.sessions.length})` : ""}
+                    </span>
+                    <span className={"state " + iconCls}>{label}</span>
+                    <span className="detail">
+                      <Detail
+                        tool={row.lead?.tool}
+                        summary={row.lead?.summary}
+                      />
+                    </span>
+                    <span className="age">
+                      {row.lead ? age(row.lead.updated_at, now) : ""}
+                    </span>
+                  </div>
+                  {tail && tail.length > 0 && <Tail events={tail} />}
+                </Fragment>
               );
             }
             // session row

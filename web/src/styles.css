@@ -316,6 +316,33 @@ body {
   }
 }
 
+/* ---- live activity tail (under active project rows) ---- */
+.tail-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  height: 16px;
+  padding: 0 8px 0 26px;
+  white-space: nowrap;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--dimmer);
+}
+.tail-line .tail-ts {
+  color: var(--dimmer);
+  flex: 0 0 auto;
+}
+.tail-line .tail-tool {
+  color: var(--green-dim);
+  flex: 0 0 auto;
+}
+.tail-line .tail-sum {
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 .divider {
   padding: 2px 8px;
   color: var(--dimmer);

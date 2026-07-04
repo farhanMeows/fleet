@@ -52,7 +52,7 @@ export function App() {
     fetchInbox().then(setInbox).catch(() => {});
   }, []);
   const loadEvents = useCallback(() => {
-    fetchEvents(50).then(setEvents).catch(() => {});
+    fetchEvents(60).then(setEvents).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -96,6 +96,21 @@ export function App() {
     () => buildRows(projects, sessionList, expanded, filter),
     [projects, sessionList, expanded, filter],
   );
+
+  // Per-project "live tail": the 3 most recent tool/activity events, ordered
+  // oldest→newest, for rendering under active project rows. `events` arrives
+  // newest-first from the API.
+  const tailsByProject = useMemo(() => {
+    const m = new Map<string, FleetEvent[]>();
+    for (const e of events) {
+      if (!e.tool && !e.summary) continue; // skip contentless bookkeeping events
+      const arr = m.get(e.project);
+      if (!arr) m.set(e.project, [e]);
+      else if (arr.length < 3) arr.push(e);
+    }
+    for (const [k, arr] of m) m.set(k, arr.reverse());
+    return m;
+  }, [events]);
 
   // Keep selection valid as rows change.
   useEffect(() => {
@@ -355,6 +370,7 @@ export function App() {
         <div className="col-left">
           <ProjectTable
             rows={rows}
+            tails={tailsByProject}
             selectedId={selectedId}
             now={now}
             filter={filter}

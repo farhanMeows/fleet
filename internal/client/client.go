@@ -193,6 +193,23 @@ func (c *Client) PlaybookDelete(name string) error {
 	return c.send(http.MethodDelete, "/api/playbooks/"+name, nil)
 }
 
+func (c *Client) Events(limit int) ([]store.EventRow, error) {
+	var out struct {
+		Events []store.EventRow `json:"events"`
+	}
+	err := c.get(fmt.Sprintf("/api/events?limit=%d", limit), &out)
+	return out.Events, err
+}
+
+// Costs returns daily token usage rows for the last N days.
+func (c *Client) Costs(days int) ([]store.UsageRow, error) {
+	var out struct {
+		Usage []store.UsageRow `json:"usage"`
+	}
+	err := c.get(fmt.Sprintf("/api/costs?days=%d", days), &out)
+	return out.Usage, err
+}
+
 type DigestRow struct {
 	Project      string `json:"project"`
 	Sessions     int64  `json:"sessions"`

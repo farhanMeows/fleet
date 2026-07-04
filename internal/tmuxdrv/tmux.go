@@ -43,12 +43,13 @@ func Up(projects []store.Project, fleetBin string) error {
 			fleetBin+" status --watch"); err != nil {
 			return fmt.Errorf("create session: %w", err)
 		}
-		tmux("set-option", "-t", SessionName, "-g", "allow-rename", "off")
+		tmux("set-option", "-t", SessionName, "allow-rename", "off")
 		// Mouse mode: click a window name in the status bar to switch —
 		// friendlier than prefix keys for tmux newcomers.
 		tmux("set-option", "-g", "mouse", "on")
 		// Hotkeys: prefix+g = dashboard, prefix+j = window picker.
-		tmux("bind-key", "g", "select-window", "-t", SessionName+":0")
+		// ":^" targets the session's first window regardless of base-index.
+		tmux("bind-key", "g", "select-window", "-t", SessionName+":^")
 		tmux("bind-key", "j", "choose-tree", "-Zw")
 	}
 
@@ -90,6 +91,27 @@ func Attach() error {
 		return err
 	}
 	return syscallExec(path, []string{"tmux", "attach-session", "-t", SessionName})
+}
+
+// Jump switches the attached tmux client to a project's window. Used by the
+// watch dashboard's Enter key; only works from inside tmux.
+func Jump(project string) error {
+	if os.Getenv("TMUX") == "" {
+		return fmt.Errorf("not inside tmux — run `fleet up` to attach")
+	}
+	windows, err := windowsByProject()
+	if err != nil {
+		return fmt.Errorf("fleet tmux session not running — start it with `fleet up`")
+	}
+	idx, ok := windows[project]
+	if !ok {
+		return fmt.Errorf("no tmux window for %q — run `fleet up` to create it", project)
+	}
+	if _, err := tmux("select-window", "-t", fmt.Sprintf("%s:%s", SessionName, idx)); err != nil {
+		return err
+	}
+	_, err = tmux("switch-client", "-t", SessionName)
+	return err
 }
 
 // SetIcon renames a project's window to reflect its current state.

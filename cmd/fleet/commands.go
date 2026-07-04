@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
 	"github.com/farhanahmad/fleet/internal/client"
@@ -207,19 +208,11 @@ func statusCmd() *cobra.Command {
 				fmt.Print(out)
 				return nil
 			}
-			// Watch mode: home-cursor + clear-to-end redraw avoids flicker.
-			fmt.Print("\x1b[2J")
-			for {
-				out, err := renderStatus(c)
-				if err != nil {
-					out = "fleet: " + err.Error() + "\n"
-				}
-				fmt.Print("\x1b[H" + out + "\x1b[J")
-				time.Sleep(2 * time.Second)
-			}
+			_, err = tea.NewProgram(newWatchModel(c), tea.WithAltScreen()).Run()
+			return err
 		},
 	}
-	cmd.Flags().BoolVar(&watch, "watch", false, "refresh continuously (dashboard mode)")
+	cmd.Flags().BoolVar(&watch, "watch", false, "interactive dashboard (j/k move, enter jump, d dispatch, q quit)")
 	return cmd
 }
 
@@ -256,14 +249,14 @@ func renderStatus(c *client.Client) (string, error) {
 	for _, p := range projects {
 		registered[p.Name] = true
 		rows := byProject[p.Name]
-		state, tool, summary, age := worstOf(rows)
+		state, tool, summary, updatedAt := worstOf(rows)
 		st := stateStyle[state]
 		now := tool
 		if summary != "" {
 			now = tool + ": " + summary
 		}
 		fmt.Fprintf(&b, "  %s%s %-24s %-14s%s %-34s %s\n",
-			st.color, st.icon, p.Name, stateLabel(state), reset, clip(now, 34), age)
+			st.color, st.icon, p.Name, stateLabel(state), reset, clip(now, 34), humanAge(updatedAt))
 	}
 
 	// Sessions running outside registered projects still deserve a row.
@@ -277,14 +270,14 @@ func renderStatus(c *client.Client) (string, error) {
 	if len(unregistered) > 0 {
 		fmt.Fprintf(&b, "\n  \x1b[2munregistered sessions:\x1b[0m\n")
 		for _, name := range unregistered {
-			state, tool, summary, age := worstOf(byProject[name])
+			state, tool, summary, updatedAt := worstOf(byProject[name])
 			st := stateStyle[state]
 			now := tool
 			if summary != "" {
 				now = tool + ": " + summary
 			}
 			fmt.Fprintf(&b, "  %s%s %-24s %-14s%s %-34s %s\n",
-				st.color, st.icon, name, stateLabel(state), reset, clip(now, 34), age)
+				st.color, st.icon, name, stateLabel(state), reset, clip(now, 34), humanAge(updatedAt))
 		}
 	}
 	fmt.Fprintf(&b, "\n  \x1b[2mprefix+<n> jump · prefix+g dash · prefix+j picker · fleet dispatch <project> \"…\"\x1b[0m\n")
@@ -292,7 +285,7 @@ func renderStatus(c *client.Client) (string, error) {
 }
 
 // worstOf picks the most attention-worthy session of a project.
-func worstOf(rows []store.Session) (state, tool, summary, age string) {
+func worstOf(rows []store.Session) (state, tool, summary string, updatedAt int64) {
 	rank := map[string]int{event.StateIdle: 1, event.StateWorking: 2, event.StateNeedsInput: 3}
 	var best *store.Session
 	for i := range rows {
@@ -301,9 +294,9 @@ func worstOf(rows []store.Session) (state, tool, summary, age string) {
 		}
 	}
 	if best == nil {
-		return "", "", "", "—"
+		return "", "", "", 0
 	}
-	return best.State, best.Tool, best.Summary, humanAge(best.UpdatedAt)
+	return best.State, best.Tool, best.Summary, best.UpdatedAt
 }
 
 func stateLabel(state string) string {
@@ -319,8 +312,13 @@ func stateLabel(state string) string {
 }
 
 func humanAge(unix int64) string {
+	if unix <= 0 {
+		return "—"
+	}
 	d := time.Since(time.Unix(unix, 0))
 	switch {
+	case d < 0:
+		return "0s"
 	case d < time.Minute:
 		return fmt.Sprintf("%ds", int(d.Seconds()))
 	case d < time.Hour:
