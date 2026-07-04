@@ -31,6 +31,7 @@ func main() {
 		upCmd(),
 		statusCmd(),
 		dispatchCmd(),
+		replyCmd(),
 		queueCmd(),
 		playbookCmd(),
 		broadcastCmd(),

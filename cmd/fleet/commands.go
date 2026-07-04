@@ -137,6 +137,34 @@ func upCmd() *cobra.Command {
 	}
 }
 
+func replyCmd() *cobra.Command {
+	var n int
+	cmd := &cobra.Command{
+		Use:   "reply <project>",
+		Short: "Print the agent's most recent reply — read a dispatched task's result",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			c, err := newClient()
+			if err != nil {
+				return err
+			}
+			replies, err := c.LastReply(args[0], n)
+			if err != nil {
+				return err
+			}
+			for i, r := range replies {
+				if i > 0 {
+					fmt.Println("\n---")
+				}
+				fmt.Println(r)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().IntVarP(&n, "count", "n", 1, "number of trailing replies to show")
+	return cmd
+}
+
 func dispatchCmd() *cobra.Command {
 	var force bool
 	cmd := &cobra.Command{

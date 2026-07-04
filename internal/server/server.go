@@ -175,6 +175,7 @@ func (s *Server) react(ev *event.Event, sess *store.Session) {
 			s.notifier.TurnDone(sess.Project)
 			notify.SendWebhooks(s.cfg.Dir, notify.Alert{
 				Kind: "turn_done", Project: sess.Project, Ts: ev.ReceivedAt,
+				Summary: lastReplySnippet(sess.TranscriptPath),
 			})
 		}
 		s.collectUsage(sess)
@@ -201,6 +202,28 @@ func (s *Server) collectUsage(sess *store.Session) {
 		return
 	}
 	s.store.SetUsageOffset(sess.SessionID, newOffset)
+}
+
+// lastReplySnippet extracts the agent's final message of the turn so
+// completion alerts carry the answer, not just "finished".
+func lastReplySnippet(transcriptPath string) string {
+	if transcriptPath == "" {
+		return ""
+	}
+	entries, _, err := transcript.Tail(transcriptPath, 0)
+	if err != nil {
+		return ""
+	}
+	for i := len(entries) - 1; i >= 0; i-- {
+		if entries[i].Role == "assistant" && !strings.HasPrefix(entries[i].Text, "→ ") {
+			text := entries[i].Text
+			if len(text) > 600 {
+				text = text[:600] + "…"
+			}
+			return text
+		}
+	}
+	return ""
 }
 
 // runQueue dispatches the next queued prompt for a project that just went

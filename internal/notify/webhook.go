@@ -85,7 +85,11 @@ func (a Alert) Text() string {
 		}
 		return msg
 	case "turn_done":
-		return "✓ " + a.Project + " finished a task"
+		msg := "✓ " + a.Project + " finished a task"
+		if a.Summary != "" {
+			msg += ":\n" + a.Summary
+		}
+		return msg
 	}
 	return a.Kind + ": " + a.Project
 }

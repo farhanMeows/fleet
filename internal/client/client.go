@@ -13,6 +13,8 @@ import (
 	"os/exec"
 	"time"
 
+	"strings"
+
 	"github.com/farhanahmad/fleet/internal/config"
 	"github.com/farhanahmad/fleet/internal/queue"
 	"github.com/farhanahmad/fleet/internal/store"
@@ -211,6 +213,49 @@ func (c *Client) Digest(day string) (*Digest, error) {
 		return nil, err
 	}
 	return &out, nil
+}
+
+// LastReply returns the trailing assistant messages (most recent last) from
+// a project's most recently active session, skipping tool-call lines.
+func (c *Client) LastReply(project string, n int) ([]string, error) {
+	var sessOut struct {
+		Sessions []store.Session `json:"sessions"`
+	}
+	if err := c.get("/api/sessions?all=1", &sessOut); err != nil {
+		return nil, err
+	}
+	var latest *store.Session
+	for i := range sessOut.Sessions {
+		s := &sessOut.Sessions[i]
+		if s.Project == project && s.TranscriptPath != "" && (latest == nil || s.UpdatedAt > latest.UpdatedAt) {
+			latest = s
+		}
+	}
+	if latest == nil {
+		return nil, fmt.Errorf("no session with a transcript found for project %q", project)
+	}
+	var tOut struct {
+		Entries []struct {
+			Role string `json:"role"`
+			Text string `json:"text"`
+		} `json:"entries"`
+	}
+	if err := c.get("/api/transcript/"+latest.SessionID, &tOut); err != nil {
+		return nil, err
+	}
+	var replies []string
+	for _, e := range tOut.Entries {
+		if e.Role == "assistant" && !strings.HasPrefix(e.Text, "→ ") {
+			replies = append(replies, e.Text)
+		}
+	}
+	if len(replies) == 0 {
+		return nil, fmt.Errorf("no assistant replies in the transcript yet")
+	}
+	if n > 0 && len(replies) > n {
+		replies = replies[len(replies)-n:]
+	}
+	return replies, nil
 }
 
 func (c *Client) SetPorts(project, ports string) error {
