@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"time"
 
 	"github.com/farhanahmad/fleet/internal/config"
+	"github.com/farhanahmad/fleet/internal/queue"
 	"github.com/farhanahmad/fleet/internal/store"
 )
 
@@ -134,4 +136,82 @@ func (c *Client) RemoveProject(name string) error {
 func (c *Client) Dispatch(project, prompt string, force bool) error {
 	return c.send(http.MethodPost, "/api/dispatch",
 		map[string]any{"project": project, "prompt": prompt, "force": force})
+}
+
+func (c *Client) QueueAdd(project, prompt string) (*queue.Item, error) {
+	raw, err := json.Marshal(map[string]string{"project": project, "prompt": prompt})
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.http.Post(c.cfg.BaseURL()+"/api/queue", "application/json", bytes.NewReader(raw))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("%s: %s", resp.Status, bytes.TrimSpace(body))
+	}
+	var item queue.Item
+	if err := json.NewDecoder(resp.Body).Decode(&item); err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (c *Client) QueueList(project string) ([]queue.Item, error) {
+	path := "/api/queue"
+	if project != "" {
+		path += "?project=" + url.QueryEscape(project)
+	}
+	var out struct {
+		Items []queue.Item `json:"items"`
+	}
+	err := c.get(path, &out)
+	return out.Items, err
+}
+
+func (c *Client) QueueCancel(id string) error {
+	return c.send(http.MethodDelete, "/api/queue/"+id, nil)
+}
+
+func (c *Client) Playbooks() ([]queue.Playbook, error) {
+	var out struct {
+		Playbooks []queue.Playbook `json:"playbooks"`
+	}
+	err := c.get("/api/playbooks", &out)
+	return out.Playbooks, err
+}
+
+func (c *Client) PlaybookSave(name, prompt string) error {
+	return c.send(http.MethodPost, "/api/playbooks", map[string]string{"name": name, "prompt": prompt})
+}
+
+func (c *Client) PlaybookDelete(name string) error {
+	return c.send(http.MethodDelete, "/api/playbooks/"+name, nil)
+}
+
+func (c *Client) Broadcast(prompt, playbook string, projects []string, all bool) ([]string, error) {
+	raw, err := json.Marshal(map[string]any{
+		"prompt": prompt, "playbook": playbook, "projects": projects, "all": all,
+	})
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.http.Post(c.cfg.BaseURL()+"/api/broadcast", "application/json", bytes.NewReader(raw))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("%s: %s", resp.Status, bytes.TrimSpace(body))
+	}
+	var out struct {
+		Projects []string `json:"projects"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	return out.Projects, nil
 }

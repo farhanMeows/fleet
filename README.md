@@ -45,9 +45,16 @@ curl -s localhost:7433/api/sessions | jq
 | `fleet daemon` | Run the API + dashboard daemon in the foreground (auto-started by other commands) |
 | `fleet hook <event>` | (internal) hook entrypoint called by Claude Code |
 
+| `fleet dispatch <project> "<prompt>" [--force]` | Send a prompt to a project's *running* agent (refuses while it awaits a permission decision unless `--force`) |
+| `fleet queue add <project> "<prompt>"` | Enqueue work; auto-dispatched when the agent goes idle (strictly one at a time) |
+| `fleet queue list [project]` / `fleet queue cancel <id>` | Inspect / cancel queued work |
+| `fleet playbook save <name> "<prompt>"` | Save a reusable prompt (`{{project}}` substituted at run time) |
+| `fleet playbook run <name> <project>...` | Queue a playbook on one or more projects |
+| `fleet broadcast "<prompt>" --projects a,b` / `--all` | Queue one prompt across many projects |
+
 Inside the tmux session: `prefix+<n>` jumps to a project window, `prefix+g` to the dashboard, `prefix+j` opens the window picker.
 
-Coming per the [PRD](docs/PRD.md) roadmap: `dispatch`, `queue`, `playbook`, `broadcast`, `digest`, `guard`, web dashboard.
+Coming per the [PRD](docs/PRD.md) roadmap: `digest`, `guard`, cost tracking, health panel, hermes remote.
 
 ## API
 

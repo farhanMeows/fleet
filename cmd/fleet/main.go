@@ -31,6 +31,9 @@ func main() {
 		upCmd(),
 		statusCmd(),
 		dispatchCmd(),
+		queueCmd(),
+		playbookCmd(),
+		broadcastCmd(),
 	)
 
 	if err := root.Execute(); err != nil {
@@ -67,7 +70,11 @@ func daemonCmd() *cobra.Command {
 				return err
 			}
 			defer st.Close()
-			return server.New(cfg, st).Run()
+			srv, err := server.New(cfg, st)
+			if err != nil {
+				return err
+			}
+			return srv.Run()
 		},
 	}
 }

@@ -93,6 +93,10 @@ func Open(dbPath string) (*Store, error) {
 
 func (s *Store) Close() error { return s.db.Close() }
 
+// DB exposes the shared handle for sibling packages (queue) that keep their
+// own tables in the same database.
+func (s *Store) DB() *sql.DB { return s.db }
+
 // --- project registry ---
 
 func (s *Store) AddProject(name, path string) error {
