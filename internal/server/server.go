@@ -67,6 +67,7 @@ func (s *Server) Run() error {
 	s.drainSpool()
 	go s.watchSpool()
 	go s.prober.Run(30 * time.Second)
+	go s.reconcile()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/hook", s.handleHook)
@@ -627,6 +628,48 @@ func spaHandler(webFS fs.FS) http.Handler {
 		r.URL.Path = "/"
 		fileServer.ServeHTTP(w, r)
 	})
+}
+
+// reconcile self-heals sessions stuck in needs_input/working: permission
+// denials and user interrupts append to the transcript but fire no Stop
+// hook, so the state machine never hears the turn end. When the transcript
+// advanced past the last hook event and has then been quiet for a minute,
+// the turn is over — downgrade to idle.
+func (s *Server) reconcile() {
+	const quiet = 60 * time.Second
+	for range time.Tick(30 * time.Second) {
+		sessions, err := s.store.ListSessions(true)
+		if err != nil {
+			continue
+		}
+		for _, sess := range sessions {
+			if sess.State != event.StateNeedsInput && sess.State != event.StateWorking {
+				continue
+			}
+			if sess.TranscriptPath == "" {
+				continue
+			}
+			fi, err := os.Stat(sess.TranscriptPath)
+			if err != nil {
+				continue
+			}
+			mtime := fi.ModTime()
+			if mtime.Unix() <= sess.UpdatedAt || time.Since(mtime) < quiet {
+				continue
+			}
+			if err := s.store.ForceState(sess.SessionID, event.StateIdle); err != nil {
+				continue
+			}
+			log.Printf("reconcile: %s (%s) %s → idle (transcript moved on without a Stop)",
+				sess.Project, sess.SessionID[:8], sess.State)
+			if updated, err := s.store.GetSession(sess.SessionID); err == nil {
+				s.hub.broadcast("session", updated)
+				if state, err := s.store.ProjectState(updated.Project); err == nil {
+					tmuxdrv.SetIcon(updated.Project, state)
+				}
+			}
+		}
+	}
 }
 
 // drainSpool ingests events spooled while the daemon was down.

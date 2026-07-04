@@ -13,6 +13,7 @@ const SchemaVersion = 1
 const (
 	SessionStart      = "SessionStart"
 	PreToolUse        = "PreToolUse"
+	PostToolUse       = "PostToolUse"
 	PermissionRequest = "PermissionRequest"
 	Stop              = "Stop"
 	SessionEnd        = "SessionEnd"
@@ -70,7 +71,7 @@ func StateFor(eventName string) string {
 	switch eventName {
 	case SessionStart, Stop:
 		return StateIdle
-	case PreToolUse:
+	case PreToolUse, PostToolUse:
 		return StateWorking
 	case PermissionRequest:
 		return StateNeedsInput

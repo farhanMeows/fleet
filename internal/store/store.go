@@ -365,6 +365,14 @@ func (s *Store) ProjectState(project string) (string, error) {
 	return worst, nil
 }
 
+// ForceState overrides a session's state (used by the reconciler when hooks
+// missed a turn boundary, e.g. a permission denial emits no Stop).
+func (s *Store) ForceState(sessionID, state string) error {
+	_, err := s.db.Exec(`UPDATE sessions SET state = ?, updated_at = ? WHERE session_id = ?`,
+		state, time.Now().Unix(), sessionID)
+	return err
+}
+
 // TurnStartedAt returns when the session's current turn began: the time of
 // the most recent Stop or SessionStart event strictly before the given event
 // id. Zero when unknown.

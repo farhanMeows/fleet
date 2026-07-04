@@ -9,7 +9,7 @@ import (
 )
 
 // hookedEvents are the Claude Code hook events fleet subscribes to.
-var hookedEvents = []string{"SessionStart", "PreToolUse", "PermissionRequest", "Stop", "SessionEnd"}
+var hookedEvents = []string{"SessionStart", "PreToolUse", "PostToolUse", "PermissionRequest", "Stop", "SessionEnd"}
 
 // Install wires `fleet hook <event>` entries into ~/.claude/settings.json,
 // backing the file up first. Existing non-fleet hooks are preserved; existing
@@ -56,7 +56,7 @@ func Install() error {
 				"command": fmt.Sprintf("%s hook %s", bin, ev),
 			}},
 		}
-		if ev == "PreToolUse" || ev == "PermissionRequest" {
+		if ev == "PreToolUse" || ev == "PostToolUse" || ev == "PermissionRequest" {
 			entry["matcher"] = "*"
 		}
 		existing, _ := hooks[ev].([]any)
