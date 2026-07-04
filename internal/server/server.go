@@ -16,18 +16,24 @@ import (
 
 	"github.com/farhanahmad/fleet/internal/config"
 	"github.com/farhanahmad/fleet/internal/event"
+	"github.com/farhanahmad/fleet/internal/notify"
 	"github.com/farhanahmad/fleet/internal/store"
 	"github.com/farhanahmad/fleet/internal/tmuxdrv"
 )
 
 type Server struct {
-	cfg   *config.Config
-	store *store.Store
-	hub   *hub
+	cfg      *config.Config
+	store    *store.Store
+	hub      *hub
+	notifier *notify.Notifier
 }
 
+// minTurnForDoneAlert filters "done" notifications to turns that were real
+// tasks, not quick chat exchanges.
+const minTurnForDoneAlert = 30 * time.Second
+
 func New(cfg *config.Config, st *store.Store) *Server {
-	return &Server{cfg: cfg, store: st, hub: newHub()}
+	return &Server{cfg: cfg, store: st, hub: newHub(), notifier: notify.New(cfg.Dir)}
 }
 
 // Run drains the spool, then serves until the process exits.
@@ -42,6 +48,7 @@ func (s *Server) Run() error {
 	mux.HandleFunc("GET /api/projects", s.handleProjects)
 	mux.HandleFunc("POST /api/projects", s.handleAddProject)
 	mux.HandleFunc("DELETE /api/projects/{name}", s.handleRemoveProject)
+	mux.HandleFunc("POST /api/dispatch", s.handleDispatch)
 	mux.HandleFunc("GET /api/stream", s.hub.serveSSE)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "ok")
@@ -72,15 +79,57 @@ func (s *Server) apply(ev *event.Event) (*store.Session, error) {
 		return nil, err
 	}
 	s.hub.broadcast("session", sess)
-	// Reflect the project's worst state on its tmux window icon, off the
-	// ingestion path.
-	go func(project string) {
-		state, err := s.store.ProjectState(project)
-		if err == nil {
-			tmuxdrv.SetIcon(project, state)
-		}
-	}(sess.Project)
+	// Side effects (tmux icon, notifications) run off the ingestion path.
+	go s.react(ev, sess)
 	return sess, nil
+}
+
+func (s *Server) react(ev *event.Event, sess *store.Session) {
+	if state, err := s.store.ProjectState(sess.Project); err == nil {
+		tmuxdrv.SetIcon(sess.Project, state)
+	}
+	switch ev.Event {
+	case event.PermissionRequest:
+		s.notifier.PermissionNeeded(sess.Project, ev.ToolName, ev.Summary)
+	case event.Stop:
+		lastID := s.store.LastEventID(sess.SessionID)
+		started := s.store.TurnStartedAt(sess.SessionID, lastID)
+		if started > 0 && time.Duration(ev.ReceivedAt-started)*time.Second >= minTurnForDoneAlert {
+			s.notifier.TurnDone(sess.Project)
+		}
+	}
+}
+
+func (s *Server) handleDispatch(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Project string `json:"project"`
+		Prompt  string `json:"prompt"`
+		Force   bool   `json:"force"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if in.Project == "" || strings.TrimSpace(in.Prompt) == "" {
+		http.Error(w, "project and prompt required", http.StatusBadRequest)
+		return
+	}
+	state, err := s.store.ProjectState(in.Project)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if state == event.StateNeedsInput && !in.Force {
+		http.Error(w,
+			fmt.Sprintf("%s is waiting for a permission decision — answer it first (keystrokes could select an option), or pass force", in.Project),
+			http.StatusConflict)
+		return
+	}
+	if err := tmuxdrv.Dispatch(in.Project, in.Prompt); err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "dispatched", "project": in.Project})
 }
 
 func (s *Server) handleAddProject(w http.ResponseWriter, r *http.Request) {

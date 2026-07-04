@@ -30,6 +30,7 @@ func main() {
 		listCmd(),
 		upCmd(),
 		statusCmd(),
+		dispatchCmd(),
 	)
 
 	if err := root.Execute(); err != nil {

@@ -137,6 +137,30 @@ func upCmd() *cobra.Command {
 	}
 }
 
+func dispatchCmd() *cobra.Command {
+	var force bool
+	cmd := &cobra.Command{
+		Use:   "dispatch <project> <prompt>",
+		Short: "Send a prompt to a project's running agent without switching windows",
+		Args:  cobra.MinimumNArgs(2),
+		RunE: func(_ *cobra.Command, args []string) error {
+			project := args[0]
+			prompt := strings.Join(args[1:], " ")
+			c, err := newClient()
+			if err != nil {
+				return err
+			}
+			if err := c.Dispatch(project, prompt, force); err != nil {
+				return err
+			}
+			fmt.Printf("dispatched to %s\n", project)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&force, "force", false, "dispatch even if the agent is waiting for a permission decision")
+	return cmd
+}
+
 func statusCmd() *cobra.Command {
 	var watch bool
 	cmd := &cobra.Command{

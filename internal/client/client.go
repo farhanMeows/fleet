@@ -130,3 +130,8 @@ func (c *Client) AddProject(name, path string) error {
 func (c *Client) RemoveProject(name string) error {
 	return c.send(http.MethodDelete, "/api/projects/"+name, nil)
 }
+
+func (c *Client) Dispatch(project, prompt string, force bool) error {
+	return c.send(http.MethodPost, "/api/dispatch",
+		map[string]any{"project": project, "prompt": prompt, "force": force})
+}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/farhanahmad/fleet/internal/event"
 	"github.com/farhanahmad/fleet/internal/store"
@@ -107,6 +108,50 @@ func SetIcon(project, state string) {
 		icon = icons[""]
 	}
 	tmux("rename-window", "-t", fmt.Sprintf("%s:%s", SessionName, idx), icon+" "+project)
+}
+
+// FocusedProject returns the @fleet_project of the fleet session's active
+// window when a client is attached to it, else "".
+func FocusedProject() string {
+	out, err := tmux("display-message", "-p", "-t", SessionName, "#{session_attached}\t#{@fleet_project}")
+	if err != nil {
+		return ""
+	}
+	parts := strings.SplitN(out, "\t", 2)
+	if len(parts) != 2 || parts[0] == "0" || parts[0] == "" {
+		return ""
+	}
+	return parts[1]
+}
+
+// Dispatch pastes a prompt into a project's claude window and submits it.
+// Bracketed paste (-p) delivers multi-line prompts as one paste; Enter is
+// sent separately after a short delay — a same-burst Enter is swallowed by
+// claude's input box.
+func Dispatch(project, prompt string) error {
+	windows, err := windowsByProject()
+	if err != nil {
+		return fmt.Errorf("fleet tmux session not running — start it with `fleet up`")
+	}
+	idx, ok := windows[project]
+	if !ok {
+		return fmt.Errorf("no tmux window for project %q — run `fleet up` to create it", project)
+	}
+	target := fmt.Sprintf("%s:%s", SessionName, idx)
+
+	load := exec.Command("tmux", "load-buffer", "-b", "fleet-dispatch", "-")
+	load.Stdin = strings.NewReader(prompt)
+	if out, err := load.CombinedOutput(); err != nil {
+		return fmt.Errorf("load-buffer: %s", strings.TrimSpace(string(out)))
+	}
+	if _, err := tmux("paste-buffer", "-p", "-d", "-b", "fleet-dispatch", "-t", target); err != nil {
+		return fmt.Errorf("paste-buffer: %w", err)
+	}
+	time.Sleep(400 * time.Millisecond)
+	if _, err := tmux("send-keys", "-t", target, "Enter"); err != nil {
+		return fmt.Errorf("submit: %w", err)
+	}
+	return nil
 }
 
 // windowsByProject maps @fleet_project tag -> window index.

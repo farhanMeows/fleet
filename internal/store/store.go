@@ -240,6 +240,29 @@ func (s *Store) ProjectState(project string) (string, error) {
 	return worst, nil
 }
 
+// TurnStartedAt returns when the session's current turn began: the time of
+// the most recent Stop or SessionStart event strictly before the given event
+// id. Zero when unknown.
+func (s *Store) TurnStartedAt(sessionID string, beforeID int64) int64 {
+	row := s.db.QueryRow(
+		`SELECT created_at FROM events
+		 WHERE session_id = ? AND id < ? AND event IN ('Stop','SessionStart')
+		 ORDER BY id DESC LIMIT 1`, sessionID, beforeID)
+	var t int64
+	if err := row.Scan(&t); err != nil {
+		return 0
+	}
+	return t
+}
+
+// LastEventID returns the newest event id for a session (0 if none).
+func (s *Store) LastEventID(sessionID string) int64 {
+	row := s.db.QueryRow(`SELECT COALESCE(MAX(id),0) FROM events WHERE session_id = ?`, sessionID)
+	var id int64
+	row.Scan(&id)
+	return id
+}
+
 func (s *Store) ListEvents(limit int, project string) ([]EventRow, error) {
 	q := `SELECT id, session_id, project, event, tool, summary, cwd, created_at FROM events`
 	var args []any
