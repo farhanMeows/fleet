@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,6 +44,8 @@ func LoadWebhooks(fleetDir string) []string {
 }
 
 // SendWebhooks fires the alert at every configured URL, best-effort.
+// Telegram Bot API URLs (api.telegram.org/bot<token>/sendMessage?chat_id=N)
+// get a human-readable text message; everything else gets the JSON payload.
 func SendWebhooks(fleetDir string, a Alert) {
 	urls := LoadWebhooks(fleetDir)
 	if len(urls) == 0 {
@@ -54,11 +57,35 @@ func SendWebhooks(fleetDir string, a Alert) {
 	}
 	client := &http.Client{Timeout: 5 * time.Second}
 	for _, u := range urls {
-		go func(url string) {
-			resp, err := client.Post(url, "application/json", bytes.NewReader(body))
+		go func(target string) {
+			var resp *http.Response
+			var err error
+			if strings.Contains(target, "api.telegram.org") {
+				resp, err = client.PostForm(target, url.Values{"text": {a.Text()}})
+			} else {
+				resp, err = client.Post(target, "application/json", bytes.NewReader(body))
+			}
 			if err == nil {
 				resp.Body.Close()
 			}
 		}(u)
 	}
+}
+
+// Text renders the alert for humans (Telegram, ntfy, etc.).
+func (a Alert) Text() string {
+	switch a.Kind {
+	case "permission_needed":
+		msg := "⚠ " + a.Project + " needs your approval"
+		if a.Tool != "" {
+			msg += "\n" + a.Tool
+			if a.Summary != "" {
+				msg += ": " + a.Summary
+			}
+		}
+		return msg
+	case "turn_done":
+		return "✓ " + a.Project + " finished a task"
+	}
+	return a.Kind + ": " + a.Project
 }
