@@ -40,6 +40,9 @@ type Server struct {
 	snippetMu    sync.Mutex
 	snippetCache map[string]snippetEntry
 
+	pendingMu sync.Mutex
+	pending   map[string]pendingApproval // project -> open permission prompt
+
 	dispatchMu sync.Mutex // serializes queue dispatches across projects
 	// inFlight marks projects with a queue-dispatched prompt whose turn has
 	// not ended yet. Session state alone can't tell (a turn with no tool use
@@ -63,12 +66,22 @@ func New(cfg *config.Config, st *store.Store) (*Server, error) {
 		cfg: cfg, store: st, hub: newHub(), notifier: notify.New(cfg.Dir),
 		queue: q, prober: health.NewProber(st), inFlight: map[string]time.Time{},
 		snippetCache: map[string]snippetEntry{},
+		pending:      map[string]pendingApproval{},
 	}, nil
 }
 
 type snippetEntry struct {
 	mtime   int64
 	snippet string
+}
+
+// pendingApproval is an open permission prompt eligible for remote approval.
+type pendingApproval struct {
+	SessionID string `json:"session_id"`
+	Tool      string `json:"tool"`
+	Summary   string `json:"summary"`
+	Hash      string `json:"hash"`
+	At        int64  `json:"at"`
 }
 
 // Run drains the spool, then serves until the process exits.
@@ -98,6 +111,8 @@ func (s *Server) Run() error {
 	mux.HandleFunc("GET /api/health", s.handleHealth)
 	mux.HandleFunc("GET /api/claude-window", s.handleClaudeWindow)
 	mux.HandleFunc("GET /api/results", s.handleResults)
+	mux.HandleFunc("GET /api/pending", s.handlePending)
+	mux.HandleFunc("POST /api/approve", s.handleApprove)
 	mux.HandleFunc("GET /api/costs", s.handleCosts)
 	mux.HandleFunc("GET /api/digest", s.handleDigest)
 	mux.HandleFunc("PUT /api/projects/{name}/ports", s.handleSetPorts)
@@ -172,6 +187,19 @@ func (s *Server) react(ev *event.Event, sess *store.Session) {
 	if state, err := s.store.ProjectState(sess.Project); err == nil {
 		tmuxdrv.SetIcon(sess.Project, state)
 	}
+	// Track the open permission prompt per project; any later activity from
+	// the same session means the prompt was answered (or superseded).
+	s.pendingMu.Lock()
+	if ev.Event == event.PermissionRequest {
+		s.pending[sess.Project] = pendingApproval{
+			SessionID: ev.SessionID, Tool: ev.ToolName, Summary: ev.Summary,
+			Hash: ev.InputHash, At: ev.ReceivedAt,
+		}
+	} else if p, ok := s.pending[sess.Project]; ok && p.SessionID == ev.SessionID {
+		delete(s.pending, sess.Project)
+	}
+	s.pendingMu.Unlock()
+
 	switch ev.Event {
 	case event.PermissionRequest:
 		s.notifier.PermissionNeeded(sess.Project, ev.ToolName, ev.Summary)
@@ -288,6 +316,83 @@ func (s *Server) handleResults(w http.ResponseWriter, _ *http.Request) {
 		results = results[:12]
 	}
 	writeJSON(w, map[string]any{"results": results})
+}
+
+// remoteApproveEnabled: remote approval is opt-in via a flag file, so the
+// capability doesn't exist until the user deliberately creates it.
+func (s *Server) remoteApproveEnabled() bool {
+	_, err := os.Stat(filepath.Join(s.cfg.Dir, "remote-approve"))
+	return err == nil
+}
+
+func (s *Server) handlePending(w http.ResponseWriter, r *http.Request) {
+	project := r.URL.Query().Get("project")
+	s.pendingMu.Lock()
+	defer s.pendingMu.Unlock()
+	if project != "" {
+		if p, ok := s.pending[project]; ok {
+			writeJSON(w, map[string]any{"pending": map[string]pendingApproval{project: p}})
+			return
+		}
+		writeJSON(w, map[string]any{"pending": map[string]pendingApproval{}})
+		return
+	}
+	writeJSON(w, map[string]any{"pending": s.pending})
+}
+
+// handleApprove answers a pending permission prompt remotely. Layered
+// verification: opt-in flag file, a tracked pending record that is fresh and
+// hash-matched, session still in needs_input, and the tmux pane visibly
+// showing a dialog whose command matches what the user was told about.
+func (s *Server) handleApprove(w http.ResponseWriter, r *http.Request) {
+	if !s.remoteApproveEnabled() {
+		http.Error(w, "remote approve is disabled — enable with: touch ~/.fleet/remote-approve", http.StatusForbidden)
+		return
+	}
+	var in struct {
+		Project string `json:"project"`
+		Hash    string `json:"hash"` // optional extra pinning
+		Deny    bool   `json:"deny"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.pendingMu.Lock()
+	p, ok := s.pending[in.Project]
+	s.pendingMu.Unlock()
+	if !ok {
+		http.Error(w, "no pending permission request tracked for "+in.Project, http.StatusNotFound)
+		return
+	}
+	if time.Since(time.Unix(p.At, 0)) > 30*time.Minute {
+		http.Error(w, "pending request is stale (>30m) — approve at the terminal", http.StatusConflict)
+		return
+	}
+	if in.Hash != "" && in.Hash != p.Hash {
+		http.Error(w, "the pending request changed since you saw it — refusing", http.StatusConflict)
+		return
+	}
+	state, err := s.store.ProjectState(in.Project)
+	if err != nil || state != event.StateNeedsInput {
+		http.Error(w, "agent is no longer waiting for a permission decision", http.StatusConflict)
+		return
+	}
+	if err := tmuxdrv.Approve(in.Project, p.Summary, !in.Deny); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	s.pendingMu.Lock()
+	delete(s.pending, in.Project)
+	s.pendingMu.Unlock()
+	decision := "approved"
+	if in.Deny {
+		decision = "denied"
+	}
+	log.Printf("remote %s: %s — %s: %s", decision, in.Project, p.Tool, p.Summary)
+	writeJSON(w, map[string]string{
+		"status": decision, "project": in.Project, "tool": p.Tool, "summary": p.Summary,
+	})
 }
 
 // cachedReplySnippet is lastReplySnippet with an mtime cache, so the

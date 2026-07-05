@@ -83,6 +83,7 @@ func (a Alert) Text() string {
 				msg += ": " + a.Summary
 			}
 		}
+		msg += "\n\nreply \"approve " + a.Project + "\" or \"deny " + a.Project + "\""
 		return msg
 	case "turn_done":
 		msg := "✓ " + a.Project + " finished a task"

@@ -166,6 +166,37 @@ func replyCmd() *cobra.Command {
 	return cmd
 }
 
+func approveCmd() *cobra.Command {
+	var deny bool
+	cmd := &cobra.Command{
+		Use:   "approve <project>",
+		Short: "Answer a pending permission prompt remotely (opt-in: touch ~/.fleet/remote-approve)",
+		Long: "Approves (or with --deny cancels) the permission dialog a project's agent is waiting on.\n" +
+			"Refuses unless the daemon-tracked pending request is fresh, the agent is still waiting,\n" +
+			"and the visible dialog matches the request. Approval is always single-shot (never\n" +
+			"\"don't ask again\").",
+		Args: cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			c, err := newClient()
+			if err != nil {
+				return err
+			}
+			tool, summary, err := c.Approve(args[0], deny)
+			if err != nil {
+				return err
+			}
+			verb := "approved"
+			if deny {
+				verb = "denied"
+			}
+			fmt.Printf("%s on %s — %s: %s\n", verb, args[0], tool, summary)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&deny, "deny", false, "cancel the prompt instead of approving (sends Escape)")
+	return cmd
+}
+
 func dispatchCmd() *cobra.Command {
 	var force bool
 	cmd := &cobra.Command{

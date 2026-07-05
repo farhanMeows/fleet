@@ -3,6 +3,8 @@
 package event
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"strings"
 )
@@ -48,11 +50,14 @@ type Event struct {
 	ToolName       string `json:"tool_name,omitempty"`
 	Summary        string `json:"summary,omitempty"`
 	PermissionMode string `json:"permission_mode,omitempty"`
-	ReceivedAt     int64  `json:"received_at"`
+	// InputHash fingerprints the exact tool_input of a PermissionRequest so
+	// a remote approval can verify the pending prompt hasn't changed.
+	InputHash  string `json:"input_hash,omitempty"`
+	ReceivedAt int64  `json:"received_at"`
 }
 
 func FromPayload(eventName string, p *HookPayload, now int64) *Event {
-	return &Event{
+	ev := &Event{
 		SchemaVersion:  SchemaVersion,
 		Event:          eventName,
 		SessionID:      p.SessionID,
@@ -63,6 +68,11 @@ func FromPayload(eventName string, p *HookPayload, now int64) *Event {
 		PermissionMode: p.PermissionMode,
 		ReceivedAt:     now,
 	}
+	if eventName == PermissionRequest && len(p.ToolInput) > 0 {
+		sum := sha256.Sum256(p.ToolInput)
+		ev.InputHash = hex.EncodeToString(sum[:6])
+	}
+	return ev
 }
 
 // StateFor maps a hook event to the session state it implies.

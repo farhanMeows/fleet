@@ -179,6 +179,56 @@ func Dispatch(project, prompt string) error {
 	return nil
 }
 
+// Approve answers a pending permission dialog in a project's window.
+// It refuses unless the pane visibly shows a permission prompt AND the
+// prompt's command matches the given summary fragment — the last line of
+// defense against approving something other than what the user saw.
+// allow=true presses 1 (approve once, never "don't ask again");
+// allow=false sends Escape (cancel — the agent stops and waits).
+func Approve(project, summaryFragment string, allow bool) error {
+	windows, err := windowsByProject()
+	if err != nil {
+		return fmt.Errorf("fleet tmux session not running")
+	}
+	idx, ok := windows[project]
+	if !ok {
+		return fmt.Errorf("no tmux window for project %q", project)
+	}
+	target := fmt.Sprintf("%s:%s", SessionName, idx)
+
+	pane, err := tmux("capture-pane", "-t", target, "-p")
+	if err != nil {
+		return fmt.Errorf("capture pane: %w", err)
+	}
+	if !strings.Contains(pane, "Do you want") || !strings.Contains(pane, "1. Yes") {
+		return fmt.Errorf("no permission dialog visible in %s — nothing to approve", project)
+	}
+	if frag := clipFragment(summaryFragment); frag != "" {
+		paneFlat := strings.Join(strings.Fields(pane), " ")
+		if !strings.Contains(paneFlat, frag) {
+			return fmt.Errorf("the visible dialog does not match the request you saw — approve at the terminal")
+		}
+	}
+
+	key := "1"
+	if !allow {
+		key = "Escape"
+	}
+	_, err = tmux("send-keys", "-t", target, key)
+	return err
+}
+
+// clipFragment picks a short verifiable slice of the summary. Dialogs wrap
+// long commands at pane width (which flattening turns into stray spaces), so
+// keep the fragment short enough to sit on the dialog's first line.
+func clipFragment(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if len(s) > 20 {
+		s = s[:20]
+	}
+	return s
+}
+
 // windowsByProject maps @fleet_project tag -> window index.
 func windowsByProject() (map[string]string, error) {
 	out, err := tmux("list-windows", "-t", SessionName, "-F", "#{window_index}\t#{@fleet_project}")

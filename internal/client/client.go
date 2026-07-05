@@ -229,6 +229,29 @@ func (c *Client) ClaudeWindow() (*ClaudeWindow, error) {
 	return &out, nil
 }
 
+// Approve answers a project's pending permission prompt remotely.
+// Returns what was approved/denied (tool + summary) for relaying to the user.
+func (c *Client) Approve(project string, deny bool) (tool, summary string, err error) {
+	raw, err := json.Marshal(map[string]any{"project": project, "deny": deny})
+	if err != nil {
+		return "", "", err
+	}
+	resp, err := c.http.Post(c.cfg.BaseURL()+"/api/approve", "application/json", bytes.NewReader(raw))
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", "", fmt.Errorf("%s", bytes.TrimSpace(body))
+	}
+	var out struct{ Tool, Summary string }
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return "", "", err
+	}
+	return out.Tool, out.Summary, nil
+}
+
 type ResultRow struct {
 	Project   string `json:"project"`
 	Snippet   string `json:"snippet"`
