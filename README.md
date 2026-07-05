@@ -52,6 +52,8 @@ curl -s localhost:7433/api/sessions | jq
 | `fleet playbook run <name> <project>...` | Queue a playbook on one or more projects |
 | `fleet broadcast "<prompt>" --projects a,b` / `--all` | Queue one prompt across many projects |
 
+| `fleet reply <project> [-n N]` | Print the agent's most recent answer (read a dispatched task's result) |
+| `fleet approve <project> [--deny]` | Answer a pending permission prompt remotely — **opt-in** (`touch ~/.fleet/remote-approve`) and layer-verified: pending record fresh + hash-matched, agent still waiting, dialog visibly matching; always single-shot, deny = Escape |
 | `fleet digest [--yesterday]` | Daily standup: sessions/turns/tools/tokens per project |
 | `fleet ports <project> 3000,3001` | Dev-server ports to health-check for a project |
 | `fleet guard add/list/remove/check` | Prod-data guardrail patterns (blocks destructive commands referencing prod hosts) |
@@ -64,7 +66,7 @@ Inside the tmux session: `prefix+<n>` jumps to a project window, `prefix+g` to t
 
 ## Phone access
 
-See [docs/HERMES.md](docs/HERMES.md) — drive fleet from Telegram/WhatsApp via hermes-agent, with permission alerts pushed through the webhook outbox (`~/.fleet/webhooks.txt`). Product direction lives in [docs/ROADMAP.md](docs/ROADMAP.md).
+See [docs/HERMES.md](docs/HERMES.md) — drive fleet from Telegram/WhatsApp via hermes-agent, with permission alerts pushed through the webhook outbox (`~/.fleet/webhooks.txt`; `api.telegram.org` URLs get human-readable messages natively). With remote approve armed, a permission alert can be answered from chat: reply "approve <project>" and hermes runs `fleet approve` — the human decision stays with you; hermes is only the courier. Product direction lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## API
 

@@ -34,9 +34,11 @@ v1 (everything in [PRD.md](PRD.md) phases 1–8) is a local, single-user product
 - **Team (per seat, higher)**: shared views, policy sync, audit, SSO.
 - License keys checked by the daemon for Pro features; core stays usable offline forever.
 
-## 6. Remote approve (deferred deliberately)
+## 6. Remote approve — ✅ shipped 2026-07-05 (opt-in)
 
-Phone-side approval of permission prompts. Requires: signed alert → explicit tap → daemon verifies the pending prompt is *still the same prompt* (tool + input hash) before injecting the keystroke, config-gated off by default, per-command audit trail. Do not build until the verification story is airtight — a wrong approve is the product-killing failure mode.
+Implemented as designed: config-gated off by default (`~/.fleet/remote-approve` flag file, created only by the human); the daemon tracks each open permission prompt with a tool-input hash and answers only if the record is <30 min old, the session is still `needs_input`, and the tmux dialog is visibly showing a command matching the request. Approvals are single-shot (key `1`, never "don't ask again"); deny sends Escape. Every remote decision is logged (`daemon.log`) and echoed back verbatim. Hermes' instructions restrict it to couriering the user's explicit approve/deny.
+
+Remaining hardening for the SaaS version: signed alerts (HMAC on the webhook payload → approve must return the signature), per-command audit table in SQLite instead of the log file, and rate limiting.
 
 ## 7. Known debt / follow-ups
 

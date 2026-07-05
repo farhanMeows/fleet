@@ -41,8 +41,10 @@ Local-first single-user product now → multi-device/team SaaS later (same event
 | R11 | Prod-data guardrail | PreToolUse deny on prod-pattern + destructive verb; fail-open |
 | R12 | Remote via hermes-agent (Telegram/WhatsApp…) | fleet exposes CLI/API + webhook outbox; hermes is the phone UI |
 | R13 | Never slow down or break Claude | hooks exit 0 in <100ms, no stdout, spool when daemon down |
+| R14 | Remote permission approval from phone | opt-in flag file; hash-verified, freshness-checked, dialog-matched, single-shot; hermes couriers the user's explicit decision (shipped 2026-07-05) |
+| R15 | Read results remotely | `fleet reply` prints an agent's latest answer; completion alerts carry the answer snippet |
 
-**Non-goals (v1):** remote permission approval (misclick risk — later behind a flag); Linux/Windows; multi-user auth/billing; editing agent conversations.
+**Non-goals (v1):** Linux/Windows; multi-user auth/billing; editing agent conversations. (Remote permission approval graduated from non-goal to shipped opt-in feature on 2026-07-05 — see R14 and ROADMAP §6.)
 
 ## 5. Architecture (implemented shape)
 
