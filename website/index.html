@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fleetdeck — Mission control for Claude Code agents</title>
+<meta name="description" content="One binary that watches every Claude Code agent across all your projects — live dashboard, permission alerts, remote dispatch. Local-first, zero overhead.">
+<meta property="og:title" content="fleetdeck — Mission control for Claude Code agents">
+<link rel="canonical" href="https://fleetdeck.in/">
+<meta property="og:description" content="Watch, alert, dispatch. Every agent, every project, one screen.">
+<meta property="og:type" content="website">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="bg" aria-hidden="true">
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="bg-glow bg-glow-3"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-noise"></div>
+</div>
+
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">
+      <svg class="brand-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="2" width="9" height="9" rx="2" fill="url(#g1)"/>
+        <rect x="13" y="2" width="9" height="9" rx="2" fill="url(#g1)" opacity=".55"/>
+        <rect x="2" y="13" width="9" height="9" rx="2" fill="url(#g1)" opacity=".55"/>
+        <rect x="13" y="13" width="9" height="9" rx="2" fill="url(#g1)" opacity=".25"/>
+        <defs><linearGradient id="g1" x1="2" y1="2" x2="22" y2="22"><stop stop-color="#7c8cf8"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+      </svg>
+      fleetdeck
+    </a>
+    <nav class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+    </nav>
+    <a class="btn btn-ghost btn-sm" href="#install">Install</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="container">
+      <p class="eyebrow reveal">Mission control for Claude Code agents</p>
+      <h1 class="hero-title reveal">
+        Every agent.<br>
+        <span class="grad-text">One screen.</span>
+      </h1>
+      <p class="hero-sub reveal">
+        fleetdeck is a single binary that watches every Claude Code agent across all your
+        projects — live dashboard, permission alerts the moment an agent needs you,
+        and remote dispatch without ever switching windows.
+      </p>
+      <div class="hero-ctas reveal">
+        <a class="btn btn-primary" href="#install">Get started
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10m0 0L9 4m4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a class="btn btn-ghost" href="#how">How it works</a>
+      </div>
+
+      <!-- animated terminal -->
+      <div class="terminal reveal" id="terminal">
+        <div class="terminal-bar">
+          <span class="tl tl-r"></span><span class="tl tl-y"></span><span class="tl tl-g"></span>
+          <span class="terminal-title">fleet — tmux · dash</span>
+        </div>
+        <div class="terminal-body">
+          <div class="t-line t-prompt"><span class="t-dollar">$</span>&nbsp;<span id="typed"></span><span class="t-cursor" id="cursor"></span></div>
+          <div class="t-dash" id="dash" hidden>
+            <div class="t-line t-head">FLEET&nbsp;&nbsp;<span class="t-dim" id="clock">09:41:07</span></div>
+            <div class="t-line t-cols t-dim">&nbsp;&nbsp;&nbsp;&nbsp;PROJECT<span class="sp1"></span>STATE<span class="sp2"></span>NOW</div>
+            <div class="t-line t-row" data-row><span class="t-ic"></span><span class="t-name">dsw</span><span class="t-state"></span><span class="t-now"></span></div>
+            <div class="t-line t-row" data-row><span class="t-ic"></span><span class="t-name">job-portal</span><span class="t-state"></span><span class="t-now"></span></div>
+            <div class="t-line t-row" data-row><span class="t-ic"></span><span class="t-name">khatakhat</span><span class="t-state"></span><span class="t-now"></span></div>
+            <div class="t-line t-row" data-row><span class="t-ic"></span><span class="t-name">swnms</span><span class="t-state"></span><span class="t-now"></span></div>
+            <div class="t-line t-row" data-row><span class="t-ic"></span><span class="t-name">voter-saas</span><span class="t-state"></span><span class="t-now"></span></div>
+            <div class="t-line t-foot t-dim">↑/↓ move · enter jump · d dispatch · q quit</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STATS ============ -->
+  <section class="stats">
+    <div class="container stats-grid">
+      <div class="stat reveal"><div class="stat-n">1</div><div class="stat-l">binary, zero deps</div></div>
+      <div class="stat reveal"><div class="stat-n">&lt;100<span class="stat-u">ms</span></div><div class="stat-l">hook overhead — agents never wait</div></div>
+      <div class="stat reveal"><div class="stat-n">100<span class="stat-u">%</span></div><div class="stat-l">local — SQLite in ~/.fleet</div></div>
+      <div class="stat reveal"><div class="stat-n">0</div><div class="stat-l">CGO — pure Go, cross-compiles anywhere</div></div>
+    </div>
+  </section>
+
+  <!-- ============ FEATURES ============ -->
+  <section class="features" id="features">
+    <div class="container">
+      <p class="eyebrow reveal">What it does</p>
+      <h2 class="section-title reveal">Run a fleet,<br><span class="grad-text">not a browser-tab circus.</span></h2>
+      <div class="feature-grid">
+
+        <article class="card reveal">
+          <div class="card-num">01</div>
+          <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3M6 9l3 3-3 3M11 15h4"/></svg></div>
+          <h3>Watch</h3>
+          <p>A live dashboard of every agent in every project — interactive TUI in the terminal, web UI at <code>localhost:7433</code>, both streaming state in real time.</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="card-num">02</div>
+          <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
+          <h3>Alert</h3>
+          <p>A notification the instant an agent hits a permission prompt or finishes its turn. Debounced, and suppressed when you're already looking at that window.</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="card-num">03</div>
+          <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></div>
+          <h3>Dispatch</h3>
+          <p>Send a prompt to any project's running agent without switching windows — <code>fleet dispatch api "fix the failing tests"</code> and keep moving.</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="card-num">04</div>
+          <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></div>
+          <h3>Queue &amp; broadcast</h3>
+          <p>Enqueue work that auto-dispatches when an agent goes idle. Save playbooks, run them across projects, broadcast one prompt to the whole fleet.</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="card-num">05</div>
+          <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></div>
+          <h3>Approve anywhere</h3>
+          <p>Answer permission prompts remotely — opt-in and layer-verified, so the approval only lands if the dialog on screen is exactly the one you saw.</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="card-num">06</div>
+          <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <h3>Guard</h3>
+          <p>A prod-data guardrail that mechanically blocks destructive commands referencing production hosts — before they ever run.</p>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HOW IT WORKS ============ -->
+  <section class="how" id="how">
+    <div class="container">
+      <p class="eyebrow reveal">How it works</p>
+      <h2 class="section-title reveal">Plugs into hooks.<br><span class="grad-text">Never slows an agent.</span></h2>
+      <div class="how-grid">
+        <div class="how-step glass reveal">
+          <div class="how-k">1 · Hooks</div>
+          <h3>Claude Code reports in</h3>
+          <p>User-level hooks call <code>fleet hook</code> on every lifecycle event — session start, tool use, permission request, turn done. The hook exits 0 in under 100&nbsp;ms and spools to disk if the daemon is down. Nothing is ever lost, nothing ever blocks.</p>
+        </div>
+        <div class="how-step glass reveal">
+          <div class="how-k">2 · Daemon</div>
+          <h3>One local brain</h3>
+          <p>Events are normalized into a versioned stream and stored in SQLite under <code>~/.fleet/</code>. A local daemon serves REST + SSE on <code>:7433</code> — your data never leaves the machine.</p>
+        </div>
+        <div class="how-step glass reveal">
+          <div class="how-k">3 · Mission control</div>
+          <h3>tmux, supercharged</h3>
+          <p><code>fleet up</code> builds a tmux session: one window per project running <code>claude</code>, live state icons in every window name, and the dashboard on window one. Jump anywhere in two keystrokes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INSTALL ============ -->
+  <section class="install" id="install">
+    <div class="container">
+      <p class="eyebrow reveal">Get started</p>
+      <h2 class="section-title reveal">Zero to fleet<br><span class="grad-text">in four commands.</span></h2>
+      <p class="install-req reveal"><b>macOS</b> · Apple silicon &amp; Intel · needs <b>tmux</b> and <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a></p>
+
+      <div class="steps">
+        <div class="step glass reveal">
+          <div class="step-head"><span class="step-n">1</span><span>Install fleet — one line, picks the right binary for your Mac</span></div>
+          <div class="codeblock wrap" data-copy="curl -fsSL https://fleetdeck.in/install.sh | sh">
+            <pre><code><span class="c-dollar">$</span> <span class="c-cmd">curl</span> -fsSL https://fleetdeck.in/install.sh <span class="c-op">|</span> <span class="c-cmd">sh</span></code></pre>
+            <button class="copy" aria-label="Copy command">Copy</button>
+          </div>
+        </div>
+
+        <div class="step glass reveal">
+          <div class="step-head"><span class="step-n">2</span><span>Wire up Claude Code hooks — idempotent, backs up your settings first</span></div>
+          <div class="codeblock" data-copy="fleet install">
+            <pre><code><span class="c-dollar">$</span> <span class="c-cmd">fleet</span> install</code></pre>
+            <button class="copy" aria-label="Copy command">Copy</button>
+          </div>
+        </div>
+
+        <div class="step glass reveal">
+          <div class="step-head"><span class="step-n">3</span><span>Register the projects you want on the grid</span></div>
+          <div class="codeblock" data-copy="fleet add ~/code/my-project">
+            <pre><code><span class="c-dollar">$</span> <span class="c-cmd">fleet</span> add ~/code/my-project
+<span class="c-dollar">$</span> <span class="c-cmd">fleet</span> add ~/code/another-one</code></pre>
+            <button class="copy" aria-label="Copy command">Copy</button>
+          </div>
+        </div>
+
+        <div class="step glass reveal">
+          <div class="step-head"><span class="step-n">4</span><span>Launch mission control</span></div>
+          <div class="codeblock" data-copy="fleet up">
+            <pre><code><span class="c-dollar">$</span> <span class="c-cmd">fleet</span> up   <span class="c-comment"># tmux session · dashboard + one claude window per project</span></code></pre>
+            <button class="copy" aria-label="Copy command">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="install-note reveal">The daemon auto-starts on first use. Watch it live: <code>fleet status --watch</code> in any terminal, or open <code>http://localhost:7433</code>.</p>
+    </div>
+  </section>
+
+  <!-- ============ CTA ============ -->
+  <section class="cta">
+    <div class="container">
+      <div class="cta-box glass reveal">
+        <h2>Put your agents<br><span class="grad-text">on the grid.</span></h2>
+        <p>One binary, five minutes, every agent accounted for.</p>
+        <div class="hero-ctas">
+          <a class="btn btn-primary" href="#install">Download for macOS
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2v8m0 0 4-4M8 10 4 6m-1 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a class="btn btn-ghost" href="#features">Explore the features</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <span class="footer-brand">fleetdeck</span>
+    <span class="t-dim">mission control for Claude Code agents · local-first · your data never leaves your machine</span>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>

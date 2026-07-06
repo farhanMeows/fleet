@@ -19,10 +19,20 @@ Claude Code's user-level hooks call `fleet hook <event>` on every session lifecy
 
 The hook path is engineered to never affect your agents: it exits 0 in under 100 ms, writes nothing to stdout, and spools events to disk when the daemon isn't running (drained on next start — nothing is lost).
 
+## Install (macOS)
+
+Apple silicon & Intel — grabs the latest release binary and puts it on your PATH:
+
+```sh
+curl -fsSL https://fleetdeck.in/install.sh | sh
+```
+
+Distribution is self-hosted: `scripts/release.sh vX.Y.Z` builds both darwin binaries and stages them (plus the installer) into `website/`; deploy that directory to your domain and swap `fleetdeck.in` for it (one value in `scripts/install.sh`, plus the URLs shown in `website/index.html` and above).
+
 ## Quick start
 
 ```sh
-make build          # builds bin/fleet (Go 1.26+, no CGO)
+make build          # or use the installer above (from source: Go 1.26+, no CGO)
 ./bin/fleet install # wires hooks into ~/.claude/settings.json (backs it up first)
 ./bin/fleet daemon  # start the daemon (API on http://127.0.0.1:7433)
 ```

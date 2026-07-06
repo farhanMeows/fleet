@@ -13,10 +13,14 @@ import (
 	"github.com/farhanahmad/fleet/internal/store"
 )
 
+// version is stamped by the release build (-ldflags "-X main.version=vX.Y.Z").
+var version = "dev"
+
 func main() {
 	root := &cobra.Command{
 		Use:           "fleet",
 		Short:         "Mission control for Claude Code agents across all your projects",
+		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
