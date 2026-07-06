@@ -24,7 +24,7 @@ The hook path is engineered to never affect your agents: it exits 0 in under 100
 Apple silicon & Intel — grabs the latest release binary and puts it on your PATH:
 
 ```sh
-curl -fsSL https://fleetdeck.in/install.sh | sh
+curl -fsSL https://www.fleetdeck.in/install.sh | sh
 ```
 
 Distribution is self-hosted: `scripts/release.sh vX.Y.Z` builds both darwin binaries and stages them (plus the installer) into `website/`; deploy that directory to your domain and swap `fleetdeck.in` for it (one value in `scripts/install.sh`, plus the URLs shown in `website/index.html` and above).

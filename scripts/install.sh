@@ -1,7 +1,7 @@
 #!/bin/sh
 # fleet installer — macOS only (Apple silicon & Intel).
 #
-#   curl -fsSL https://fleetdeck.in/install.sh | sh
+#   curl -fsSL https://www.fleetdeck.in/install.sh | sh
 #
 # BASE_URL is the only place the distribution host is named. Point it at
 # wherever website/ is deployed — scripts/release.sh stages the binaries
@@ -9,7 +9,7 @@
 # download endpoint) means changing this one value.
 set -eu
 
-BASE_URL="${FLEET_BASE_URL:-https://fleetdeck.in}"
+BASE_URL="${FLEET_BASE_URL:-https://www.fleetdeck.in}"
 
 [ "$(uname -s)" = "Darwin" ] || {
   echo "fleet currently ships for macOS only" >&2
