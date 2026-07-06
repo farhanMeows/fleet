@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -21,17 +22,27 @@ import (
 
 const watchInterval = 2 * time.Second
 
+// Explicit 256-color palette so the dashboard looks the same in every
+// terminal profile instead of inheriting e.g. a green-on-black default.
+// (256-code colors because Apple Terminal has no truecolor support.)
 var (
-	wsTitle    = lipgloss.NewStyle().Bold(true)
-	wsDim      = lipgloss.NewStyle().Faint(true)
+	cText  = lipgloss.Color("252") // soft white — primary text
+	cDim   = lipgloss.Color("243") // gray — chrome, labels, secondary
+	cGreen = lipgloss.Color("71")  // calm green — idle / ok / names
+	cAmber = lipgloss.Color("178") // amber — working
+	cRed   = lipgloss.Color("203") // soft red — needs attention
+
+	wsTitle    = lipgloss.NewStyle().Bold(true).Foreground(cText)
+	wsText     = lipgloss.NewStyle().Foreground(cText)
+	wsDim      = lipgloss.NewStyle().Foreground(cDim)
 	wsSelected = lipgloss.NewStyle().Reverse(true).Bold(true)
-	wsErr      = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	wsOK       = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	wsErr      = lipgloss.NewStyle().Foreground(cRed)
+	wsOK       = lipgloss.NewStyle().Foreground(cGreen)
 
 	wsState = map[string]lipgloss.Style{
-		event.StateWorking:    lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
-		event.StateNeedsInput: lipgloss.NewStyle().Foreground(lipgloss.Color("1")),
-		event.StateIdle:       lipgloss.NewStyle().Foreground(lipgloss.Color("2")),
+		event.StateWorking:    lipgloss.NewStyle().Foreground(cAmber),
+		event.StateNeedsInput: lipgloss.NewStyle().Foreground(cRed).Bold(true),
+		event.StateIdle:       lipgloss.NewStyle().Foreground(cGreen),
 		"":                    wsDim,
 	}
 	wsIcon = map[string]string{
@@ -59,8 +70,9 @@ type watchRow struct {
 }
 
 type (
-	tickMsg time.Time
-	dataMsg struct {
+	tickMsg  time.Time
+	blinkMsg time.Time
+	dataMsg  struct {
 		rows          []watchRow
 		tokIn, tokOut int64 // fleet-wide today
 		events        []store.EventRow
@@ -93,6 +105,8 @@ type watchModel struct {
 	flash         flashMsg
 	flashAt       time.Time
 
+	blink bool // phase of the ~600ms pulse (working dots, cursor)
+
 	dispatching bool
 	input       textinput.Model
 }
@@ -105,11 +119,15 @@ func newWatchModel(c *client.Client) watchModel {
 }
 
 func (m watchModel) Init() tea.Cmd {
-	return tea.Batch(fetchRows(m.client), tick())
+	return tea.Batch(fetchRows(m.client), tick(), blinkTick())
 }
 
 func tick() tea.Cmd {
 	return tea.Tick(watchInterval, func(t time.Time) tea.Msg { return tickMsg(t) })
+}
+
+func blinkTick() tea.Cmd {
+	return tea.Tick(600*time.Millisecond, func(t time.Time) tea.Msg { return blinkMsg(t) })
 }
 
 func fetchRows(c *client.Client) tea.Cmd {
@@ -238,6 +256,10 @@ func (m watchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.flash = flashMsg{}
 		}
 		return m, tea.Batch(fetchRows(m.client), tick())
+
+	case blinkMsg:
+		m.blink = !m.blink
+		return m, blinkTick()
 
 	case dataMsg:
 		m.rows = msg.rows
@@ -429,10 +451,27 @@ func (m watchModel) renderRow(row watchRow, selected bool, nameW, stateW, branch
 		return wsSelected.Render(line)
 	}
 	// Color only the icon..state span (like the static table); Render wraps
-	// the already-padded text, so column math stays plain.
+	// the already-padded text, so column math stays plain. Everything after
+	// the state column renders dim so the row reads name-first. The working
+	// dot and needs-you marker pulse with the blink phase (like the site).
 	span := 2 + 2 + nameW + 2 + stateW
 	head := runewidth.Truncate(line, span, "")
-	return wsState[row.state].Render(head) + line[len(head):]
+	iconStyle := wsState[row.state]
+	if !m.blink && (row.state == event.StateWorking || row.state == event.StateNeedsInput) {
+		iconStyle = iconStyle.Faint(true)
+	}
+	iconSpan := runewidth.Truncate(head, 4, "") // indent + icon cell
+	return iconStyle.Render(iconSpan) + wsState[row.state].Render(head[len(iconSpan):]) + wsDim.Render(line[len(head):])
+}
+
+// unmarkdown strips markdown syntax from an agent reply so snippets read as
+// prose in the TUI (** __ ` # [text](url) → plain text).
+var mdLink = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
+
+func unmarkdown(s string) string {
+	s = mdLink.ReplaceAllString(s, "$1")
+	replacer := strings.NewReplacer("**", "", "__", "", "`", "", "###", "", "##", "", "# ", "")
+	return replacer.Replace(s)
 }
 
 // claudeLine renders the estimated 5h usage-window bar with reset countdown.
@@ -476,7 +515,11 @@ func (m watchModel) View() string {
 	nameW, stateW, branchW, srvW, nowW, ageW := m.layout()
 
 	var b strings.Builder
-	header := wsTitle.Render("FLEET") + "  " + wsDim.Render(time.Now().Format("15:04:05"))
+	cursor := " "
+	if m.blink {
+		cursor = "▊"
+	}
+	header := wsTitle.Render("FLEET") + "  " + wsDim.Render(time.Now().Format("15:04:05")) + " " + wsOK.Render(cursor)
 	if m.tokIn > 0 || m.tokOut > 0 {
 		header += "  " + wsDim.Render("· today "+humanTokens(m.tokIn)+" in / "+humanTokens(m.tokOut)+" out")
 	}
@@ -606,18 +649,27 @@ func (m watchModel) renderResults(b *strings.Builder, budget int) {
 	}
 	b.WriteString("\n" + wsDim.Render("  ── LAST RESULTS "+strings.Repeat("─", max(0, m.width-19))) + "\n")
 	lines := 2
-	for _, r := range m.results {
-		if lines+2 > budget {
+	for i, r := range m.results {
+		// breathing room between entries when space allows
+		need := 3
+		if i == 0 {
+			need = 2
+		}
+		if lines+need > budget {
 			break
+		}
+		if i > 0 {
+			b.WriteString("\n")
+			lines++
 		}
 		b.WriteString("  " + wsOK.Render(r.Project) + wsDim.Render("  ·  "+humanAge(r.UpdatedAt)+" ago") + "\n")
 		lines++
-		snippet := strings.Join(strings.Fields(r.Snippet), " ") // collapse newlines
+		snippet := strings.Join(strings.Fields(unmarkdown(r.Snippet)), " ")
 		for _, ln := range wrap(snippet, m.width-6, 2) {
 			if lines >= budget {
 				break
 			}
-			b.WriteString("    " + ln + "\n")
+			b.WriteString("    " + wsText.Render(ln) + "\n")
 			lines++
 		}
 	}

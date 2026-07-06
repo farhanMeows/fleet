@@ -44,6 +44,13 @@ func Up(projects []store.Project, fleetBin string) error {
 			return fmt.Errorf("create session: %w", err)
 		}
 		tmux("set-option", "-t", SessionName, "allow-rename", "off")
+		// Session-scoped status-bar theme: dark strip, dim window names,
+		// green highlight on the active window (instead of tmux's default
+		// bright-green bar, which fights the dashboard's palette).
+		tmux("set-option", "-t", SessionName, "status-style", "bg=colour234,fg=colour243")
+		tmux("set-option", "-t", SessionName, "window-status-current-style", "fg=colour71,bold")
+		tmux("set-option", "-t", SessionName, "window-status-style", "fg=colour243")
+		tmux("set-option", "-t", SessionName, "status-left-style", "fg=colour252,bold")
 		// Mouse mode: click a window name in the status bar to switch —
 		// friendlier than prefix keys for tmux newcomers.
 		tmux("set-option", "-g", "mouse", "on")
