@@ -105,7 +105,8 @@ type watchModel struct {
 	flash         flashMsg
 	flashAt       time.Time
 
-	blink bool // phase of the ~600ms pulse (working dots, cursor)
+	blink     bool                 // phase of the ~600ms pulse (working dots, cursor)
+	flashRows map[string]time.Time // rows that just changed state flash briefly (like the site's rowflip)
 
 	dispatching bool
 	input       textinput.Model
@@ -115,7 +116,7 @@ func newWatchModel(c *client.Client) watchModel {
 	ti := textinput.New()
 	ti.Prompt = ""
 	ti.CharLimit = 0
-	return watchModel{client: c, input: ti}
+	return watchModel{client: c, input: ti, flashRows: map[string]time.Time{}}
 }
 
 func (m watchModel) Init() tea.Cmd {
@@ -262,6 +263,21 @@ func (m watchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, blinkTick()
 
 	case dataMsg:
+		// Rows whose state changed flash briefly — the site's rowflip effect.
+		prev := map[string]string{}
+		for _, r := range m.rows {
+			prev[r.name] = r.state
+		}
+		for _, r := range msg.rows {
+			if old, ok := prev[r.name]; ok && old != r.state {
+				m.flashRows[r.name] = time.Now().Add(1200 * time.Millisecond)
+			}
+		}
+		for name, until := range m.flashRows {
+			if time.Now().After(until) {
+				delete(m.flashRows, name)
+			}
+		}
 		m.rows = msg.rows
 		m.tokIn, m.tokOut = msg.tokIn, msg.tokOut
 		m.events, m.queued, m.window = msg.events, msg.queued, msg.window
@@ -456,6 +472,10 @@ func (m watchModel) renderRow(row watchRow, selected bool, nameW, stateW, branch
 	// dot and needs-you marker pulse with the blink phase (like the site).
 	span := 2 + 2 + nameW + 2 + stateW
 	head := runewidth.Truncate(line, span, "")
+	// rowflip: a row that just changed state renders bright for ~1.2s.
+	if until, ok := m.flashRows[row.name]; ok && time.Now().Before(until) {
+		return lipgloss.NewStyle().Bold(true).Foreground(cText).Render(line)
+	}
 	iconStyle := wsState[row.state]
 	if !m.blink && (row.state == event.StateWorking || row.state == event.StateNeedsInput) {
 		iconStyle = iconStyle.Faint(true)
