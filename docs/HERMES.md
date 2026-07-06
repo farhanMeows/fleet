@@ -4,7 +4,7 @@
 
 ## What you get
 
-- **From any chat app:** "what are my agents doing?" → hermes runs `fleet status` and replies with the table; "queue on dsw: fix the signup bug" → `fleet queue add dsw "fix the signup bug"`; "what happened today?" → `fleet digest`.
+- **From any chat app:** "what are my agents doing?" → hermes runs `fleet status` and replies with the table; "queue on api-server: fix the signup bug" → `fleet queue add api-server "fix the signup bug"`; "what happened today?" → `fleet digest`.
 - **Pushed to you:** the moment an agent needs a permission approval (or finishes a long task), fleet POSTs an alert to the webhook you configure; hermes forwards it to your chat.
 - **Remote approvals (opt-in):** with `~/.fleet/remote-approve` present, replying "approve <project>" (or "deny <project>") to a permission alert makes hermes run `fleet approve` — which only acts if the daemon-tracked pending request is fresh (<30 min), unchanged (tool-input hash), the agent is still waiting, and the on-screen dialog matches the request. Approvals are single-shot (never "don't ask again"); deny sends Escape. Delete the flag file to revert to terminal-only. Hermes' instructions forbid it from approving on its own judgment — it acts only on your explicit approve/deny.
 
@@ -44,7 +44,7 @@ any ⚠ NEEDS YOU rows first.
 Fleet POSTs JSON alerts to every URL in `~/.fleet/webhooks.txt` (one per line):
 
 ```json
-{"kind": "permission_needed", "project": "job-portal", "tool": "Bash",
+{"kind": "permission_needed", "project": "api-server", "tool": "Bash",
  "summary": "pm2 restart ecosystem.config.js", "ts": 1783155488}
 ```
 

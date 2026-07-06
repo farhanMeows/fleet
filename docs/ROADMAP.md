@@ -42,8 +42,8 @@ Remaining hardening for the SaaS version: signed alerts (HMAC on the webhook pay
 
 ## 7. Known debt / follow-ups
 
-- **Rotate the credentials embedded in project allowlists** (DSW, swnms, job-portal, voter-management-saas, khatakhat `settings.local.json` contain live DB URLs/passwords/API keys). Move to env vars; the allowlists should reference commands, not secrets. (User-action item, flagged during the initial audit.)
-- swnms `settings.local.json` has an invalid `"*"` allow rule Claude Code ignores with a startup warning — clean it up.
+- **Never let credentials live in permission allowlists**: `.claude/settings.local.json` files should reference commands, not secrets (connection strings, tokens). Fleet could ship a `fleet doctor` check that flags allowlist entries containing URL-embedded credentials.
+- Add a `fleet doctor` lint for invalid permission rules (e.g. a bare `"*"` allow entry) that Claude Code skips with a startup warning.
 - Dashboard: surface queue contents + costs charts (backend endpoints exist: `/api/queue`, `/api/costs`, `/api/health`).
 - `fleet up` window ordering: windows are created in registry order; deterministic numbering for muscle memory is best-effort after add/remove — consider `fleet up --renumber`.
 - Transcript parser and usage parser share JSONL walking — unify if a third consumer appears.

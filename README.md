@@ -5,11 +5,11 @@
 ```
 ┌─ FLEET ────────────────────────────────────────────────┐
 │  PROJECT         STATE          NOW                    │
-│  DSW             ● working      Bash: npm test         │
-│  job-portal      ⚠ needs you    Bash: pm2 restart …    │
-│  swnms           ✓ done         —                      │
-│  khatakhat       ● working      Edit: api/orders.ts    │
-│  voter-saas      ○ idle         —                      │
+│  storefront      ● working      Bash: npm test         │
+│  api-server      ⚠ needs you    Bash: pm2 restart …    │
+│  data-pipeline   ✓ done         —                      │
+│  mobile-app      ● working      Edit: api/orders.ts    │
+│  docs-site       ○ idle         —                      │
 └────────────────────────────────────────────────────────┘
 ```
 
