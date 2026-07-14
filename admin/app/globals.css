@@ -1,0 +1,68 @@
+:root {
+  --bg: #0a0e0a;
+  --panel: #10160f;
+  --line: #1e2a1e;
+  --text: #d5dbe1;
+  --dim: #5a6a5a;
+  --green: #3fb950;
+  --amber: #d29922;
+  --red: #f85149;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
+  font-size: 14px;
+  min-height: 100vh;
+}
+
+.wrap { max-width: 860px; margin: 0 auto; padding: 48px 20px; }
+
+.brand { color: var(--green); font-weight: 700; letter-spacing: 0.5px; }
+.brand span { color: var(--dim); font-weight: 400; }
+
+.panel {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 20px;
+  margin-top: 18px;
+}
+.panel h2 { margin: 0 0 14px; font-size: 13px; color: var(--dim); font-weight: 600; letter-spacing: 1px; }
+
+input, button {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  outline: none;
+}
+input:focus { border-color: var(--green); }
+input.amount { width: 200px; }
+
+button { cursor: pointer; }
+button.primary { border-color: var(--green); color: var(--green); font-weight: 600; }
+button.primary:hover { background: rgba(63, 185, 80, 0.1); }
+button.ghost { color: var(--dim); }
+button:disabled { opacity: 0.5; cursor: default; }
+
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+th { text-align: left; color: var(--dim); font-weight: 600; font-size: 12px; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); }
+td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+td.mono { color: var(--dim); font-size: 12px; }
+
+.st { font-weight: 600; }
+.st.captured { color: var(--green); }
+.st.paid { color: var(--amber); }
+.st.created { color: var(--dim); }
+.st.failed { color: var(--red); }
+
+.err { color: var(--red); margin-top: 10px; }
+.ok { color: var(--green); margin-top: 10px; }
+.hint { color: var(--dim); font-size: 12px; margin-top: 10px; }

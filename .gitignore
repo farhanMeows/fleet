@@ -5,3 +5,6 @@ web/dist/
 dist/
 website/releases/
 website/install.sh
+admin/node_modules/
+admin/.next/
+admin/next-env.d.ts
