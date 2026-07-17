@@ -150,3 +150,74 @@ const termIO = new IntersectionObserver((entries) => {
   }
 });
 termIO.observe(document.getElementById("terminal"));
+
+// ————— install gate: Google sign-in before the install command —————
+// GOOGLE_CLIENT_ID comes from console.cloud.google.com → Credentials →
+// OAuth Client ID (Web) with https://www.fleetdeck.in as authorized origin.
+// While empty, the gate stays hidden and install remains open to everyone.
+const GOOGLE_CLIENT_ID = "";
+const ACCOUNTS_API = "https://admin.fleetdeck.in/api/auth/google";
+
+const gateEl = document.getElementById("install-gate");
+const stepsEl = document.getElementById("install-steps");
+const signedEl = document.getElementById("install-signed");
+
+function currentUser() {
+  try { return JSON.parse(localStorage.getItem("fleetdeck_user") || "null"); }
+  catch { return null; }
+}
+
+function showInstall(user) {
+  gateEl.hidden = true;
+  stepsEl.hidden = false;
+  if (user?.email) {
+    document.getElementById("signed-email").textContent = user.email;
+    signedEl.hidden = false;
+  }
+}
+
+function showGate() {
+  gateEl.hidden = false;
+  stepsEl.hidden = true;
+  signedEl.hidden = true;
+}
+
+function onCredential(resp) {
+  let user = {};
+  try {
+    const payload = JSON.parse(atob(resp.credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    user = { email: payload.email, name: payload.name, at: Date.now() };
+  } catch { user = { at: Date.now() }; }
+  localStorage.setItem("fleetdeck_user", JSON.stringify(user));
+  // Record the account server-side; never block install on our backend.
+  fetch(ACCOUNTS_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ credential: resp.credential }),
+  }).catch(() => {});
+  showInstall(user);
+}
+
+function initGate() {
+  if (!GOOGLE_CLIENT_ID || !gateEl) return; // not configured → install stays open
+  const user = currentUser();
+  if (user) return showInstall(user);
+  showGate();
+  const boot = () => {
+    if (!window.google?.accounts?.id) return setTimeout(boot, 200);
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onCredential });
+    google.accounts.id.renderButton(document.getElementById("gsi-button"), {
+      theme: "filled_black", size: "large", text: "continue_with", shape: "pill",
+    });
+  };
+  boot();
+}
+
+document.getElementById("sign-out")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  localStorage.removeItem("fleetdeck_user");
+  showGate();
+  initGate();
+});
+
+initGate();

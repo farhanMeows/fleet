@@ -21,6 +21,7 @@ truth) · `failed` (declined / signature mismatch).
    - `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET`
    - `RAZORPAY_WEBHOOK_SECRET` — invent a long random string (used in step 5)
    - `DATABASE_URL` — the Neon connection string
+   - `GOOGLE_CLIENT_ID` — for verifying website sign-ins (see below)
    → Deploy.
 4. **Domain**: Vercel project → Settings → Domains → add
    `admin.fleetdeck.in`. In GoDaddy DNS add: CNAME `admin` →

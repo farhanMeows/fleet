@@ -210,7 +210,7 @@
             <li>Phone remote &amp; approvals built in</li>
             <li>Daily digests, cost analytics, priority support</li>
           </ul>
-          <a class="btn btn-primary price-cta" href="mailto:farhan.officialahmad@gmail.com?subject=fleetdeck%20Pro%20early%20access">Get early access</a>
+          <a class="btn btn-primary price-cta" href="#install">Install</a>
         </article>
 
         <article class="card price-card reveal">
@@ -236,7 +236,17 @@
       <h2 class="section-title reveal">Zero to fleet<br><span class="grad-text">in four commands.</span></h2>
       <p class="install-req reveal"><b>macOS</b> · Apple silicon &amp; Intel · needs <b>tmux</b> and <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a></p>
 
-      <div class="steps">
+      <div class="install-gate glass reveal" id="install-gate" hidden>
+        <h3>Create your free account to install</h3>
+        <p>One click — we use it to keep you posted on releases and to link your fleet when Pro launches.</p>
+        <div id="gsi-button"></div>
+      </div>
+
+      <div class="install-signed" id="install-signed" hidden>
+        signed in as <b id="signed-email"></b> · <a href="#" id="sign-out">sign out</a>
+      </div>
+
+      <div class="steps" id="install-steps">
         <div class="step glass reveal">
           <div class="step-head"><span class="step-n">1</span><span>Install fleet — one line, picks the right binary for your Mac</span></div>
           <div class="codeblock wrap" data-copy="curl -fsSL https://www.fleetdeck.in/install.sh | sh">
@@ -300,6 +310,7 @@
   </div>
 </footer>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="main.js"></script>
 </body>
 </html>

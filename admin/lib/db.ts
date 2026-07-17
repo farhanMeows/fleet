@@ -74,6 +74,37 @@ export async function markPayment(opts: {
       updated_at = now()`;
 }
 
+// --- website accounts (Sign in with Google on the marketing site) ---
+
+let usersEnsured = false;
+
+async function ensureUsers(): Promise<void> {
+  if (usersEnsured) return;
+  await sql()`
+    CREATE TABLE IF NOT EXISTS users (
+      id         SERIAL PRIMARY KEY,
+      sub        TEXT NOT NULL UNIQUE,
+      email      TEXT NOT NULL,
+      name       TEXT,
+      sign_ins   INTEGER NOT NULL DEFAULT 1,
+      first_seen TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_seen  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`;
+  usersEnsured = true;
+}
+
+export async function upsertUser(u: { sub: string; email: string; name: string | null }) {
+  await ensureUsers();
+  await sql()`
+    INSERT INTO users (sub, email, name)
+    VALUES (${u.sub}, ${u.email}, ${u.name})
+    ON CONFLICT (sub) DO UPDATE SET
+      email = EXCLUDED.email,
+      name = COALESCE(EXCLUDED.name, users.name),
+      sign_ins = users.sign_ins + 1,
+      last_seen = now()`;
+}
+
 export async function listPayments(limit = 50): Promise<PaymentRow[]> {
   await ensureSchema();
   return (await sql()`

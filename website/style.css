@@ -448,3 +448,13 @@ a:hover { color: var(--cyan); }
   .reveal { opacity: 1; transform: none; transition: none; }
   .t-cursor { animation: none; }
 }
+
+/* ————— install gate ————— */
+
+.install-gate { max-width: 560px; padding: 28px; text-align: center; margin-bottom: 8px; }
+.install-gate h3 { font-family: var(--font-d); font-size: 21px; margin: 0 0 8px; }
+.install-gate p { color: var(--ink-dim); font-size: 14.5px; margin: 0 0 20px; }
+.install-gate #gsi-button { display: flex; justify-content: center; }
+.install-signed { color: var(--ink-faint); font-size: 13px; margin: 0 0 18px; }
+.install-signed b { color: var(--ink-dim); font-weight: 600; }
+.install-signed a { color: var(--ink-faint); }
