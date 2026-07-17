@@ -7,8 +7,8 @@ import { buildCreditItems, buildLineItems, round2 } from "@/lib/usage";
 import { GST_RATE } from "@/lib/seller";
 
 const DEFAULT_BILL_TO: BillTo = {
-  name: "Farhan's projects",
-  lines: ["Paona Bazar, Imphal 795001", "Imphal 795001", "MANIPUR", "India"],
+  name: "Khatakhat-tech",
+  lines: ["Imphal 795001", "MANIPUR", "India"],
   email: "farhanzakiahmad2017@gmail.com",
 };
 

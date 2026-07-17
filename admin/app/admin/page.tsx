@@ -288,7 +288,7 @@ export default function AdminPage() {
             required
           />
           <input
-            placeholder="bill-to name (blank = Farhan's projects)"
+            placeholder="bill-to name (blank = Khatakhat-tech)"
             value={invName}
             onChange={(e) => setInvName(e.target.value)}
             style={{ flex: 1, minWidth: 180 }}
