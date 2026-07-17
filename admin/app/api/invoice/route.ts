@@ -51,7 +51,10 @@ export async function POST(req: NextRequest) {
         amount: inrTotal,
         currency: "INR",
         description: `Fleetdeck invoice ${number}`,
-        reference_id: number,
+        // Razorpay rejects duplicate reference_ids; a failed attempt can leave
+        // one behind without an invoice row, so suffix to stay collision-free.
+        // Nothing reads this back — the webhook reconciles by payment-link id.
+        reference_id: `${number}-${Date.now().toString(36)}`,
         customer: { name: billTo.name, email: billTo.email },
         notify: { email: false, sms: false },
         reminder_enable: false,
@@ -60,10 +63,13 @@ export async function POST(req: NextRequest) {
       payLinkId = link.id;
       payLinkUrl = link.short_url;
     } catch (e) {
-      return NextResponse.json(
-        { error: "payment link failed: " + (e instanceof Error ? e.message : "unknown") },
-        { status: 502 },
-      );
+      // The Razorpay SDK throws plain objects ({ statusCode, error: {...} }),
+      // not Errors — dig the description out so failures aren't "unknown".
+      console.error("payment link creation failed:", e);
+      const desc =
+        (e as { error?: { description?: string } })?.error?.description ??
+        (e instanceof Error ? e.message : JSON.stringify(e));
+      return NextResponse.json({ error: "payment link failed: " + desc }, { status: 502 });
     }
   }
 
