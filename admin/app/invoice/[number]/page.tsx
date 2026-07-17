@@ -50,7 +50,6 @@ export default async function InvoicePage({ params }: { params: Promise<{ number
             {SELLER.addressLines.map((l) => (
               <div key={l}>{l}</div>
             ))}
-            <div>{SELLER.email}</div>
           </div>
           <div>
             <b>Bill to</b>
