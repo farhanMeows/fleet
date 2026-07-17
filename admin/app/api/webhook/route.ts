@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { markPayment } from "@/lib/db";
+import { markInvoicePaid, markPayment } from "@/lib/db";
 
 // Server-to-server confirmation from Razorpay. This is the source of truth:
 // it fires even if the buyer closed the browser mid-flow. Configure in the
@@ -19,6 +19,15 @@ export async function POST(req: NextRequest) {
   }
 
   const event = JSON.parse(raw);
+
+  // Invoice payment links resolve via payment_link.paid.
+  if (event.event === "payment_link.paid") {
+    const link = event?.payload?.payment_link?.entity;
+    const pay = event?.payload?.payment?.entity;
+    if (link?.id) await markInvoicePaid(link.id, pay?.id ?? "");
+    return NextResponse.json({ ok: true });
+  }
+
   const entity = event?.payload?.payment?.entity;
   if (!entity?.order_id) return NextResponse.json({ ok: true, skipped: true });
 

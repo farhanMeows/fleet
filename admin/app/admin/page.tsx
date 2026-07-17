@@ -13,6 +13,15 @@ type Payment = {
   created_at: string;
 };
 
+type Invoice = {
+  number: string;
+  bill_to: { name: string } | null;
+  usd_subtotal: string;
+  inr_total: number;
+  status: string;
+  pay_link_url: string | null;
+};
+
 declare global {
   interface Window {
     Razorpay: new (opts: Record<string, unknown>) => { open: () => void };
@@ -28,13 +37,48 @@ export default function AdminPage() {
   const [msg, setMsg] = useState<{ text: string; isErr: boolean } | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
 
+  const [invUsd, setInvUsd] = useState("");
+  const [invName, setInvName] = useState("");
+  const [invBusy, setInvBusy] = useState(false);
+  const [invMsg, setInvMsg] = useState<{ text: string; isErr: boolean } | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+
   const loadPayments = useCallback(async () => {
     const res = await fetch("/api/payments");
     if (res.status === 401) return setAuthed(false);
     setAuthed(true);
     const data = await res.json();
     setPayments(data.payments ?? []);
+    const inv = await fetch("/api/invoice");
+    if (inv.ok) setInvoices((await inv.json()).invoices ?? []);
   }, []);
+
+  async function createInvoice(e: React.FormEvent) {
+    e.preventDefault();
+    setInvMsg(null);
+    setInvBusy(true);
+    try {
+      const res = await fetch("/api/invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          usd: Number(invUsd),
+          billTo: invName ? { name: invName, lines: [], email: undefined } : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "failed");
+      setInvUsd("");
+      setInvName("");
+      setInvMsg({ text: `created ${data.invoice.number}`, isErr: false });
+      await loadPayments();
+      window.open(`/invoice/${data.invoice.number}`, "_blank");
+    } catch (err) {
+      setInvMsg({ text: err instanceof Error ? err.message : "failed", isErr: true });
+    } finally {
+      setInvBusy(false);
+    }
+  }
 
   useEffect(() => {
     loadPayments();
@@ -181,8 +225,96 @@ export default function AdminPage() {
         </div>
       </form>
 
+      <form className="panel" onSubmit={createInvoice}>
+        <h2>CREATE INVOICE</h2>
+        <div className="row">
+          <span style={{ color: "var(--dim)" }}>$</span>
+          <input
+            className="amount"
+            type="number"
+            min="1"
+            step="1"
+            placeholder="amount (USD)"
+            value={invUsd}
+            onChange={(e) => setInvUsd(e.target.value)}
+            required
+          />
+          <input
+            placeholder="bill-to name (blank = Farhan's projects)"
+            value={invName}
+            onChange={(e) => setInvName(e.target.value)}
+            style={{ flex: 1, minWidth: 180 }}
+          />
+          <button className="primary" type="submit" disabled={invBusy}>
+            {invBusy ? "…" : "create invoice →"}
+          </button>
+        </div>
+        {invMsg && <div className={invMsg.isErr ? "err" : "ok"}>{invMsg.text}</div>}
+        <div className="hint">
+          USD auto-converts to INR at today&rsquo;s rate; a Razorpay pay-link is attached and GST
+          added. Opens the printable invoice; status flips to paid when the link is settled.
+        </div>
+      </form>
+
       <div className="panel">
-        <h2>HISTORY</h2>
+        <h2>INVOICES</h2>
+        {invoices.length === 0 ? (
+          <div className="hint">no invoices yet</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>NUMBER</th>
+                <th>BILL TO</th>
+                <th>USD</th>
+                <th>INR TOTAL</th>
+                <th>STATUS</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((iv) => (
+                <tr key={iv.number}>
+                  <td className="mono">{iv.number}</td>
+                  <td>{iv.bill_to?.name ?? "—"}</td>
+                  <td>${Number(iv.usd_subtotal).toLocaleString()}</td>
+                  <td>₹{(iv.inr_total / 100).toLocaleString("en-IN")}</td>
+                  <td>
+                    <span className={`st ${iv.status}`}>{iv.status}</span>
+                  </td>
+                  <td className="mono">
+                    <a href={`/invoice/${iv.number}`} target="_blank" rel="noreferrer">
+                      view
+                    </a>
+                    {iv.pay_link_url && iv.status !== "paid" && (
+                      <>
+                        {" · "}
+                        <a href={iv.pay_link_url} target="_blank" rel="noreferrer">
+                          pay
+                        </a>
+                        {" · "}
+                        <a
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            navigator.clipboard?.writeText(iv.pay_link_url!);
+                            setInvMsg({ text: `copied pay link for ${iv.number}`, isErr: false });
+                          }}
+                        >
+                          copy link
+                        </a>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="panel">
+        <h2>PAYMENTS</h2>
         {payments.length === 0 ? (
           <div className="hint">no payments yet</div>
         ) : (
