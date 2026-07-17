@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "amount must be $0.01 – $100,000" }, { status: 400 });
   }
   const withLink = body.paymentLink !== false; // default: attach a Razorpay link
-  const billTo: BillTo = body.billTo?.name ? body.billTo : DEFAULT_BILL_TO;
+  const billTo: BillTo = DEFAULT_BILL_TO; // hardcoded by design — not client-settable
 
   // Optional real active-project count for the "Active projects" line.
   const projectsRaw = Math.trunc(Number(body.projects));

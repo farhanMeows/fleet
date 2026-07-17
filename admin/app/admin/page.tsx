@@ -38,9 +38,6 @@ export default function AdminPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
 
   const [invUsd, setInvUsd] = useState("");
-  const [invName, setInvName] = useState("");
-  const [invAddr, setInvAddr] = useState("");
-  const [invEmail, setInvEmail] = useState("");
   const [invProjects, setInvProjects] = useState("");
   const [invKind, setInvKind] = useState<"usage" | "credits">("usage");
   const [invBusy, setInvBusy] = useState(false);
@@ -71,24 +68,11 @@ export default function AdminPage() {
           usd: Number(invUsd),
           kind: invKind,
           projects: invProjects ? Number(invProjects) : undefined,
-          billTo: invName
-            ? {
-                name: invName,
-                lines: invAddr
-                  .split("\n")
-                  .map((l) => l.trim())
-                  .filter(Boolean),
-                email: invEmail.trim() || undefined,
-              }
-            : undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "failed");
       setInvUsd("");
-      setInvName("");
-      setInvAddr("");
-      setInvEmail("");
       setInvProjects("");
       setInvMsg({ text: `created ${data.invoice.number}`, isErr: false });
       await loadPayments();
@@ -288,31 +272,6 @@ export default function AdminPage() {
             required
           />
           <input
-            placeholder="bill-to name (blank = Khatakhat-tech)"
-            value={invName}
-            onChange={(e) => setInvName(e.target.value)}
-            style={{ flex: 1, minWidth: 180 }}
-          />
-          <button className="primary" type="submit" disabled={invBusy}>
-            {invBusy ? "…" : "create invoice →"}
-          </button>
-        </div>
-        <div className="row">
-          <textarea
-            placeholder={"bill-to address (one line per row)"}
-            value={invAddr}
-            onChange={(e) => setInvAddr(e.target.value)}
-            rows={2}
-            style={{ flex: 2, minWidth: 220, resize: "vertical" }}
-          />
-          <input
-            type="email"
-            placeholder="bill-to email"
-            value={invEmail}
-            onChange={(e) => setInvEmail(e.target.value)}
-            style={{ flex: 1, minWidth: 180 }}
-          />
-          <input
             type="number"
             min="1"
             max="999"
@@ -324,14 +283,16 @@ export default function AdminPage() {
             title={invKind === "credits" ? "not used for credit top-ups" : undefined}
             style={{ width: 220, opacity: invKind === "credits" ? 0.4 : 1 }}
           />
+          <button className="primary" type="submit" disabled={invBusy}>
+            {invBusy ? "…" : "create invoice →"}
+          </button>
         </div>
         {invMsg && <div className={invMsg.isErr ? "err" : "ok"}>{invMsg.text}</div>}
         <div className="hint">
-          Invoice shows USD only (GST added on top); the attached Razorpay pay-link converts to INR
-          at today&rsquo;s rate. Opens the printable invoice; status flips to paid when the link is
-          settled. Address &amp; email print in the invoice&rsquo;s Bill-to block. Credit top-ups
-          bill a single prepaid line — balance is drawn down by agent sessions and service pauses
-          when it runs out.
+          Bills to Khatakhat-tech (fixed). Invoice shows USD only (GST added on top); the attached
+          Razorpay pay-link converts to INR at today&rsquo;s rate. Opens the printable invoice;
+          status flips to paid when the link is settled. Credit top-ups bill a single prepaid
+          line — balance is drawn down by agent sessions and service pauses when it runs out.
         </div>
       </form>
 
