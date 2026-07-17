@@ -245,7 +245,7 @@ export default function AdminPage() {
           <input
             className="amount"
             type="number"
-            min="1"
+            min="0.01"
             step="0.01"
             placeholder="amount (USD, decimals ok)"
             value={invUsd}

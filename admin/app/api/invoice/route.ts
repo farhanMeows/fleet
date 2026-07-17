@@ -22,8 +22,8 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const usd = round2(Number(body.usd)); // decimals allowed, e.g. 149.99
-  if (!Number.isFinite(usd) || usd < 1 || usd > 100000) {
-    return NextResponse.json({ error: "amount must be $1 – $100,000" }, { status: 400 });
+  if (!Number.isFinite(usd) || usd < 0.01 || usd > 100000) {
+    return NextResponse.json({ error: "amount must be $0.01 – $100,000" }, { status: 400 });
   }
   const withLink = body.paymentLink !== false; // default: attach a Razorpay link
   const billTo: BillTo = body.billTo?.name ? body.billTo : DEFAULT_BILL_TO;
