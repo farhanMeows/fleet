@@ -9,7 +9,7 @@ import { GST_RATE } from "@/lib/seller";
 const DEFAULT_BILL_TO: BillTo = {
   name: "Khatakhat-tech",
   lines: ["Imphal 795001", "MANIPUR", "India"],
-  email: "farhanzakiahmad2017@gmail.com",
+  email: "anasfinance22@gmail.com",
 };
 
 export async function GET() {
