@@ -1,13 +1,12 @@
 #!/bin/sh
 # Build macOS release artifacts (darwin/amd64 + darwin/arm64) and stage them
-# into website/ for self-hosted distribution — no GitHub involved. Deploy the
-# website/ directory to your host and the one-line installer serves from it:
+# into admin/releases/ — served only through the token-gated download API
+# (admin.fleetdeck.in/api/download), never as public static files:
 #
 #   scripts/release.sh v0.1.0
-#   → website/install.sh                         (copied from scripts/)
-#   → website/releases/fleet-darwin-arm64.tar.gz
-#   → website/releases/fleet-darwin-x86_64.tar.gz
-#   → website/releases/checksums.txt, latest.txt
+#   → admin/releases/fleet-darwin-arm64.tar.gz
+#   → admin/releases/fleet-darwin-x86_64.tar.gz
+#   → admin/releases/checksums.txt, latest.txt
 set -eu
 
 VERSION="${1:?usage: scripts/release.sh vX.Y.Z}"
@@ -19,7 +18,7 @@ echo "==> building embedded web dashboard"
 (cd web && npm run build)
 
 echo "==> building darwin binaries"
-OUT=website/releases
+OUT=admin/releases
 rm -rf "$OUT" dist && mkdir -p "$OUT" dist
 for goarch in amd64 arm64; do
   case "$goarch" in
@@ -35,13 +34,12 @@ for goarch in amd64 arm64; do
 done
 (cd "$OUT" && shasum -a 256 *.tar.gz > checksums.txt)
 printf '%s\n' "$VERSION" > "$OUT/latest.txt"
-cp scripts/install.sh website/install.sh
-echo "    $OUT/checksums.txt · $OUT/latest.txt · website/install.sh"
+echo "    $OUT/checksums.txt · $OUT/latest.txt"
 
 cat <<'EOF'
 
-Staged. To ship: deploy the website/ directory to your host (any static
-server). The install one-liner then works from your domain:
+Staged. To ship: deploy admin/ (the binaries ride along inside it) and the
+website/ static directory. Signed-in users get their personal one-liner:
 
-  curl -fsSL https://<your-domain>/install.sh | sh
+  curl -fsSL "https://admin.fleetdeck.in/api/install.sh?t=<token>" | sh
 EOF

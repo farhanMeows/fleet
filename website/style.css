@@ -178,6 +178,29 @@ a:hover { color: var(--cyan); }
 
 .hero-ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
 
+.hero-price {
+  display: flex; align-items: baseline; justify-content: center; gap: 14px;
+  margin: 4px 0 36px;
+}
+.hp-side {
+  font-family: var(--font-m); font-size: 12.5px; font-weight: 500;
+  letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-dim);
+}
+.hp-amount {
+  font-family: var(--font-d); font-weight: 700; font-size: 46px; letter-spacing: -0.02em;
+  background: var(--grad);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+
+.btn-lg {
+  padding: 17px 42px; font-size: 14.5px;
+  letter-spacing: 0.16em; text-transform: uppercase; border-radius: 10px;
+}
+
+/* ————— terminal showcase (below the hero) ————— */
+
+.showcase { padding: 8px 0 24px; }
+
 /* ————— terminal ————— */
 
 .terminal {
@@ -463,9 +486,21 @@ a:hover { color: var(--cyan); }
 .price-card { overflow: visible; }
 .price-card::before { border-radius: var(--r); }
 
-/* pulse the sign-in gate when an install CTA is clicked while logged out */
-.install-gate.attn { animation: gate-attn 1.2s ease 2; }
-@keyframes gate-attn {
-  0%, 100% { border-color: var(--line); box-shadow: none; }
-  50% { border-color: rgba(52, 211, 153, 0.65); box-shadow: 0 0 32px rgba(52, 211, 153, 0.25); }
+.install-gate .hero-ctas { justify-content: center; }
+
+/* ————— auth pages (signin.html / signup.html) ————— */
+
+.auth-body { min-height: 100vh; display: flex; flex-direction: column; }
+.auth-wrap {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 28px; padding: 48px 20px;
 }
+.auth-brand { font-size: 22px; }
+.auth-card { width: 100%; max-width: 410px; padding: 38px 34px 34px; text-align: center; }
+.auth-card h1 { font-family: var(--font-d); font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 10px; }
+.auth-card > p { color: var(--ink-dim); font-size: 14.5px; margin-bottom: 26px; }
+.auth-gsi { display: flex; justify-content: center; min-height: 44px; }
+.auth-alt { margin-top: 24px; font-size: 13.5px; color: var(--ink-dim); }
+.auth-err { margin-top: 14px; color: var(--red); font-size: 13.5px; }
+.auth-note { color: var(--ink-faint); font-size: 12.5px; }

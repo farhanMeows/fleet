@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create your account — fleetdeck</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-body" data-mode="signup">
+
+<div class="bg" aria-hidden="true">
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-noise"></div>
+</div>
+
+<main class="auth-wrap">
+  <a class="brand auth-brand" href="./">
+    <svg class="brand-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="2" y="2" width="9" height="9" rx="2" fill="url(#g1)"/>
+      <rect x="13" y="2" width="9" height="9" rx="2" fill="url(#g1)" opacity=".55"/>
+      <rect x="2" y="13" width="9" height="9" rx="2" fill="url(#g1)" opacity=".55"/>
+      <rect x="13" y="13" width="9" height="9" rx="2" fill="url(#g1)" opacity=".25"/>
+      <defs><linearGradient id="g1" x1="2" y1="2" x2="22" y2="22"><stop stop-color="#7c8cf8"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+    </svg>
+    fleetdeck
+  </a>
+
+  <div class="auth-card glass">
+    <h1>Create your free account</h1>
+    <p>One click with Google — then your personal install command unlocks instantly.</p>
+    <div id="gsi-button" class="auth-gsi"></div>
+    <p class="auth-err" id="auth-err" hidden></p>
+    <p class="auth-alt">Already have an account? <a href="signin.html">Sign in</a></p>
+  </div>
+
+  <p class="auth-note">Free tier included — no credit card, no passwords.</p>
+</main>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+</body>
+</html>

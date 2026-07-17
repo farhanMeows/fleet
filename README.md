@@ -21,13 +21,13 @@ The hook path is engineered to never affect your agents: it exits 0 in under 100
 
 ## Install (macOS)
 
-Apple silicon & Intel — grabs the latest release binary and puts it on your PATH:
+Apple silicon & Intel. Downloads require a (free) account: sign in at [www.fleetdeck.in](https://www.fleetdeck.in) and the site shows your personal install one-liner:
 
 ```sh
-curl -fsSL https://www.fleetdeck.in/install.sh | sh
+curl -fsSL "https://admin.fleetdeck.in/api/install.sh?t=<your-token>" | sh
 ```
 
-Distribution is self-hosted: `scripts/release.sh vX.Y.Z` builds both darwin binaries and stages them (plus the installer) into `website/`; deploy that directory to your domain and swap `fleetdeck.in` for it (one value in `scripts/install.sh`, plus the URLs shown in `website/index.html` and above).
+Distribution is self-hosted and token-gated: `scripts/release.sh vX.Y.Z` builds both darwin binaries and stages them into `admin/releases/`, where the admin app serves them only through `/api/download` after Google sign-in (`DOWNLOAD_SECRET` signs the tokens). `scripts/install.sh` remains for dev/self-host use via `FLEET_BASE_URL`/`FLEET_INSTALL_URL`.
 
 ## Quick start
 

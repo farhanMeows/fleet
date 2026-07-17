@@ -38,12 +38,13 @@
       fleetdeck
     </a>
     <nav class="nav-links">
-      <a href="#features">Features</a>
+      <a href="#features">Overview</a>
       <a href="#how">How it works</a>
       <a href="#pricing">Pricing</a>
-      <a href="#install">Install</a>
     </nav>
-    <a class="btn btn-ghost btn-sm" href="#install">Install</a>
+    <a class="btn btn-primary btn-sm" href="signin.html" id="nav-auth">Sign in
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10m0 0L9 4m4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
   </div>
 </header>
 
@@ -52,23 +53,29 @@
   <!-- ============ HERO ============ -->
   <section class="hero">
     <div class="container">
-      <p class="eyebrow reveal">Mission control for Claude Code agents</p>
       <h1 class="hero-title reveal">
         Every agent.<br>
         <span class="grad-text">One screen.</span>
       </h1>
       <p class="hero-sub reveal">
-        fleetdeck is a single binary that watches every Claude Code agent across all your
-        projects — live dashboard, permission alerts the moment an agent needs you,
-        and remote dispatch without ever switching windows.
+        fleetdeck is mission control for Claude Code agents — one binary that watches
+        every agent across all your projects, alerts you the moment one needs you,
+        and dispatches work without ever switching windows.
       </p>
-      <div class="hero-ctas reveal">
-        <a class="btn btn-primary" href="#install">Get started
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10m0 0L9 4m4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </a>
-        <a class="btn btn-ghost" href="#how">How it works</a>
+      <div class="hero-price reveal">
+        <span class="hp-side">starting at</span>
+        <span class="hp-amount">$99</span>
+        <span class="hp-side">monthly</span>
       </div>
+      <div class="hero-ctas reveal">
+        <a class="btn btn-primary btn-lg" href="signup.html" data-cta>Get started</a>
+      </div>
+    </div>
+  </section>
 
+  <!-- ============ LIVE TERMINAL ============ -->
+  <section class="showcase">
+    <div class="container">
       <!-- animated terminal -->
       <div class="terminal reveal" id="terminal">
         <div class="terminal-bar">
@@ -222,7 +229,7 @@
             <li>Audit trail — who approved what</li>
             <li>SSO &amp; invoicing</li>
           </ul>
-          <a class="btn btn-ghost price-cta" href="mailto:farhan.officialahmad@gmail.com?subject=fleetdeck%20Team">Talk to us</a>
+          <a class="btn btn-ghost price-cta" href="mailto:contact@fleetdeck.com?subject=fleetdeck%20Team">Talk to us</a>
         </article>
 
       </div>
@@ -236,52 +243,24 @@
       <h2 class="section-title reveal">Zero to fleet<br><span class="grad-text">in four commands.</span></h2>
       <p class="install-req reveal"><b>macOS</b> · Apple silicon &amp; Intel · needs <b>tmux</b> and <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a></p>
 
-      <div class="install-gate glass reveal" id="install-gate" hidden>
-        <h3>Create your free account to install</h3>
-        <p>One click — we use it to keep you posted on releases and to link your fleet when Pro launches.</p>
-        <div id="gsi-button"></div>
+      <div class="install-gate glass reveal" id="install-locked" hidden>
+        <h3>Sign in to install</h3>
+        <p>The installer is tied to your fleetdeck account — create one free in a click, and your personal install command appears right here.</p>
+        <div class="hero-ctas">
+          <a class="btn btn-primary" href="signup.html">Create free account</a>
+          <a class="btn btn-ghost" href="signin.html">Sign in</a>
+        </div>
       </div>
 
       <div class="install-signed" id="install-signed" hidden>
         signed in as <b id="signed-email"></b> · <a href="#" id="sign-out">sign out</a>
       </div>
 
-      <div class="steps" id="install-steps">
-        <div class="step glass reveal">
-          <div class="step-head"><span class="step-n">1</span><span>Install fleet — one line, picks the right binary for your Mac</span></div>
-          <div class="codeblock wrap" data-copy="curl -fsSL https://www.fleetdeck.in/install.sh | sh">
-            <pre><code><span class="c-dollar">$</span> <span class="c-cmd">curl</span> -fsSL https://www.fleetdeck.in/install.sh <span class="c-op">|</span> <span class="c-cmd">sh</span></code></pre>
-            <button class="copy" aria-label="Copy command">Copy</button>
-          </div>
-        </div>
+      <!-- Steps are rendered by main.js only for signed-in users; the install
+           command never appears in this document for anyone else. -->
+      <div class="steps" id="install-steps" hidden></div>
 
-        <div class="step glass reveal">
-          <div class="step-head"><span class="step-n">2</span><span>Wire up Claude Code hooks — idempotent, backs up your settings first</span></div>
-          <div class="codeblock" data-copy="fleet install">
-            <pre><code><span class="c-dollar">$</span> <span class="c-cmd">fleet</span> install</code></pre>
-            <button class="copy" aria-label="Copy command">Copy</button>
-          </div>
-        </div>
-
-        <div class="step glass reveal">
-          <div class="step-head"><span class="step-n">3</span><span>Register the projects you want on the grid</span></div>
-          <div class="codeblock" data-copy="fleet add ~/code/my-project">
-            <pre><code><span class="c-dollar">$</span> <span class="c-cmd">fleet</span> add ~/code/my-project
-<span class="c-dollar">$</span> <span class="c-cmd">fleet</span> add ~/code/another-one</code></pre>
-            <button class="copy" aria-label="Copy command">Copy</button>
-          </div>
-        </div>
-
-        <div class="step glass reveal">
-          <div class="step-head"><span class="step-n">4</span><span>Launch mission control</span></div>
-          <div class="codeblock" data-copy="fleet up">
-            <pre><code><span class="c-dollar">$</span> <span class="c-cmd">fleet</span> up   <span class="c-comment"># tmux session · dashboard + one claude window per project</span></code></pre>
-            <button class="copy" aria-label="Copy command">Copy</button>
-          </div>
-        </div>
-      </div>
-
-      <p class="install-note reveal">The daemon auto-starts on first use. Watch it live: <code>fleet status --watch</code> in any terminal, or open <code>http://localhost:7433</code>.</p>
+      <p class="install-note" id="install-note" hidden>The daemon auto-starts on first use. Watch it live: <code>fleet status --watch</code> in any terminal, or open <code>http://localhost:7433</code>.</p>
     </div>
   </section>
 
@@ -292,8 +271,8 @@
         <h2>Put your agents<br><span class="grad-text">on the grid.</span></h2>
         <p>One binary, five minutes, every agent accounted for.</p>
         <div class="hero-ctas">
-          <a class="btn btn-primary" href="#install">Download for macOS
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2v8m0 0 4-4M8 10 4 6m-1 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <a class="btn btn-primary" href="signup.html" data-cta>Get started
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10m0 0L9 4m4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </a>
           <a class="btn btn-ghost" href="#features">Explore the features</a>
         </div>
@@ -310,7 +289,6 @@
   </div>
 </footer>
 
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="main.js"></script>
 </body>
 </html>

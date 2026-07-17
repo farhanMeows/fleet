@@ -29,25 +29,29 @@ document.querySelectorAll(".card").forEach((card) => {
   });
 });
 
-// Copy buttons.
-document.querySelectorAll(".codeblock").forEach((block) => {
-  const btn = block.querySelector(".copy");
-  if (!btn) return;
-  btn.addEventListener("click", async () => {
-    const text = block.dataset.copy || block.querySelector("code").innerText;
-    try {
-      await navigator.clipboard.writeText(text);
-      btn.textContent = "Copied";
-      btn.classList.add("done");
-      setTimeout(() => {
-        btn.textContent = "Copy";
-        btn.classList.remove("done");
-      }, 1600);
-    } catch {
-      /* clipboard unavailable (e.g. non-secure context) — no-op */
-    }
+// Copy buttons — re-runnable so dynamically injected blocks get wired too.
+function bindCopy(root = document) {
+  root.querySelectorAll(".codeblock").forEach((block) => {
+    const btn = block.querySelector(".copy");
+    if (!btn || btn.dataset.bound) return;
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", async () => {
+      const text = block.dataset.copy || block.querySelector("code").innerText;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = "Copied";
+        btn.classList.add("done");
+        setTimeout(() => {
+          btn.textContent = "Copy";
+          btn.classList.remove("done");
+        }, 1600);
+      } catch {
+        /* clipboard unavailable (e.g. non-secure context) — no-op */
+      }
+    });
   });
-});
+}
+bindCopy();
 
 /* ————— animated hero terminal ————— */
 
@@ -143,93 +147,111 @@ function mutate() {
 }
 
 // Start typing once the terminal scrolls into view (or immediately if visible).
-const termIO = new IntersectionObserver((entries) => {
-  if (entries.some((e) => e.isIntersecting)) {
-    termIO.disconnect();
-    setTimeout(type, 500);
-  }
-});
-termIO.observe(document.getElementById("terminal"));
+const terminalEl = document.getElementById("terminal");
+if (terminalEl) {
+  const termIO = new IntersectionObserver((entries) => {
+    if (entries.some((e) => e.isIntersecting)) {
+      termIO.disconnect();
+      setTimeout(type, 500);
+    }
+  });
+  termIO.observe(terminalEl);
+}
 
-// ————— install gate: Google sign-in before the install command —————
-// GOOGLE_CLIENT_ID comes from console.cloud.google.com → Credentials →
-// OAuth Client ID (Web) with https://www.fleetdeck.in as authorized origin.
-// While empty, the gate stays hidden and install remains open to everyone.
-const GOOGLE_CLIENT_ID = "967010490410-esda3g39m59poia2c4qadi0mln0loe3c.apps.googleusercontent.com";
-const ACCOUNTS_API = "https://admin.fleetdeck.in/api/auth/google";
+/* ————— account session & gated install —————
+   Sign-in happens on signin.html / signup.html (Google only). The admin API
+   returns a signed download token; the install command below embeds it, and
+   the download endpoints reject requests without one. Logged out, this page
+   contains no install command at all. */
 
-const gateEl = document.getElementById("install-gate");
+const ADMIN_API = "https://admin.fleetdeck.in";
+const SESSION_KEY = "fleetdeck_session";
+
+const lockedEl = document.getElementById("install-locked");
 const stepsEl = document.getElementById("install-steps");
 const signedEl = document.getElementById("install-signed");
+const noteEl = document.getElementById("install-note");
+const navAuthEl = document.getElementById("nav-auth");
 
-function currentUser() {
-  try { return JSON.parse(localStorage.getItem("fleetdeck_user") || "null"); }
-  catch { return null; }
-}
-
-function showInstall(user) {
-  gateEl.hidden = true;
-  stepsEl.hidden = false;
-  if (user?.email) {
-    document.getElementById("signed-email").textContent = user.email;
-    signedEl.hidden = false;
+function session() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    return s?.token && (!s.exp || Date.now() < s.exp) ? s : null;
+  } catch {
+    return null;
   }
 }
 
-function showGate() {
-  gateEl.hidden = false;
-  stepsEl.hidden = true;
-  signedEl.hidden = true;
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
-function onCredential(resp) {
-  let user = {};
-  try {
-    const payload = JSON.parse(atob(resp.credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    user = { email: payload.email, name: payload.name, at: Date.now() };
-  } catch { user = { at: Date.now() }; }
-  localStorage.setItem("fleetdeck_user", JSON.stringify(user));
-  // Record the account server-side; never block install on our backend.
-  fetch(ACCOUNTS_API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ credential: resp.credential }),
-  }).catch(() => {});
-  showInstall(user);
+function renderSteps(user) {
+  const curl = `curl -fsSL "${ADMIN_API}/api/install.sh?t=${user.token}" | sh`;
+  stepsEl.innerHTML = `
+    <div class="step glass in">
+      <div class="step-head"><span class="step-n">1</span><span>Install fleet — your personal one-liner, picks the right binary for your Mac</span></div>
+      <div class="codeblock wrap" data-copy="${esc(curl)}">
+        <pre><code><span class="c-dollar">$</span> <span class="c-cmd">curl</span> -fsSL "${esc(ADMIN_API)}/api/install.sh?t=${esc(user.token)}" <span class="c-op">|</span> <span class="c-cmd">sh</span></code></pre>
+        <button class="copy" aria-label="Copy command">Copy</button>
+      </div>
+    </div>
+
+    <div class="step glass in">
+      <div class="step-head"><span class="step-n">2</span><span>Wire up Claude Code hooks — idempotent, backs up your settings first</span></div>
+      <div class="codeblock" data-copy="fleet install">
+        <pre><code><span class="c-dollar">$</span> <span class="c-cmd">fleet</span> install</code></pre>
+        <button class="copy" aria-label="Copy command">Copy</button>
+      </div>
+    </div>
+
+    <div class="step glass in">
+      <div class="step-head"><span class="step-n">3</span><span>Register the projects you want on the grid</span></div>
+      <div class="codeblock" data-copy="fleet add ~/code/my-project">
+        <pre><code><span class="c-dollar">$</span> <span class="c-cmd">fleet</span> add ~/code/my-project
+<span class="c-dollar">$</span> <span class="c-cmd">fleet</span> add ~/code/another-one</code></pre>
+        <button class="copy" aria-label="Copy command">Copy</button>
+      </div>
+    </div>
+
+    <div class="step glass in">
+      <div class="step-head"><span class="step-n">4</span><span>Launch mission control</span></div>
+      <div class="codeblock" data-copy="fleet up">
+        <pre><code><span class="c-dollar">$</span> <span class="c-cmd">fleet</span> up   <span class="c-comment"># tmux session · dashboard + one claude window per project</span></code></pre>
+        <button class="copy" aria-label="Copy command">Copy</button>
+      </div>
+    </div>`;
+  bindCopy(stepsEl);
 }
 
-function initGate() {
-  if (!GOOGLE_CLIENT_ID || !gateEl) return; // not configured → install stays open
-  const user = currentUser();
-  if (user) return showInstall(user);
-  showGate();
-  const boot = () => {
-    if (!window.google?.accounts?.id) return setTimeout(boot, 200);
-    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onCredential });
-    google.accounts.id.renderButton(document.getElementById("gsi-button"), {
-      theme: "filled_black", size: "large", text: "continue_with", shape: "pill",
-    });
-  };
-  boot();
+function renderAuthState() {
+  const user = session();
+  if (user) {
+    lockedEl.hidden = true;
+    stepsEl.hidden = false;
+    noteEl.hidden = false;
+    document.getElementById("signed-email").textContent = user.email || "your account";
+    signedEl.hidden = false;
+    renderSteps(user);
+    if (navAuthEl) {
+      navAuthEl.textContent = "Install";
+      navAuthEl.href = "#install";
+    }
+    // Get-started CTAs jump straight to install once signed in.
+    document.querySelectorAll("a[data-cta]").forEach((a) => (a.href = "#install"));
+  } else {
+    lockedEl.hidden = false;
+    stepsEl.hidden = true;
+    stepsEl.innerHTML = "";
+    noteEl.hidden = true;
+    signedEl.hidden = true;
+  }
 }
 
 document.getElementById("sign-out")?.addEventListener("click", (e) => {
   e.preventDefault();
-  localStorage.removeItem("fleetdeck_user");
-  showGate();
-  initGate();
+  localStorage.removeItem(SESSION_KEY);
+  renderAuthState();
 });
 
-initGate();
-
-// Any install CTA clicked while logged out: scroll lands on the gate —
-// actively ask for the account (Google One Tap) and pulse the gate.
-document.querySelectorAll('a[href="#install"]').forEach((a) => {
-  a.addEventListener("click", () => {
-    if (!GOOGLE_CLIENT_ID || currentUser()) return;
-    gateEl.classList.remove("attn");
-    void gateEl.offsetWidth; // restart animation
-    gateEl.classList.add("attn");
-    if (window.google?.accounts?.id) google.accounts.id.prompt();
-  });
-});
+renderAuthState();
