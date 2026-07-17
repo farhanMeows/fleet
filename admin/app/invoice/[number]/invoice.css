@@ -14,9 +14,7 @@
   font-size: 14px;
   line-height: 1.55;
 }
-.inv-top { display: flex; justify-content: space-between; align-items: flex-start; }
 .inv-top h1 { font-size: 30px; font-weight: 700; margin: 0; letter-spacing: -0.02em; }
-.inv-mark { width: 0; height: 0; border-left: 13px solid transparent; border-right: 13px solid transparent; border-bottom: 22px solid #0a0a0a; }
 
 .inv-meta { display: flex; gap: 40px; margin-top: 28px; }
 .inv-meta span { color: #666; margin-right: 8px; }
@@ -34,8 +32,7 @@
 .inv-due h2 { font-size: 22px; font-weight: 700; margin: 0 0 8px; letter-spacing: -0.01em; }
 .inv-pay { color: #2563eb; text-decoration: underline; font-size: 14px; }
 
-.inv-tax-note { color: #444; margin: 20px 0 2px; }
-.inv-fx { color: #888; font-size: 12.5px; margin: 0 0 8px; }
+.inv-tax-note { color: #444; margin: 20px 0 8px; }
 
 .inv-lines { width: 100%; border-collapse: collapse; margin-top: 28px; }
 .inv-lines th { text-align: left; font-weight: 600; color: #666; font-size: 12.5px; padding: 8px 0; border-bottom: 1px solid #e5e5e5; }

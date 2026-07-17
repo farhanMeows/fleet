@@ -4,9 +4,6 @@ import { SELLER } from "@/lib/seller";
 import PrintBar from "./print-bar";
 import "./invoice.css";
 
-function inr(paise: number): string {
-  return "₹" + (paise / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 function usd(n: number): string {
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -20,15 +17,16 @@ export default async function InvoicePage({ params }: { params: Promise<{ number
   if (!inv) notFound();
 
   const usdSub = Number(inv.usd_subtotal);
-  const rate = Number(inv.fx_rate);
-  const gstPct = Math.round(Number(inv.gst_rate) * 100);
+  const gstRate = Number(inv.gst_rate);
+  const gstPct = Math.round(gstRate * 100);
+  const usdGst = Math.round(usdSub * gstRate * 100) / 100;
+  const usdTotal = Math.round((usdSub + usdGst) * 100) / 100;
 
   return (
     <div className="inv-page">
       <div className="inv">
         <header className="inv-top">
           <h1>Invoice</h1>
-          <div className="inv-mark" />
         </header>
 
         <div className="inv-meta">
@@ -65,7 +63,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ number
         </div>
 
         <div className="inv-due">
-          <h2>{inr(inv.inr_total)} due {date(inv.issued_at)}</h2>
+          <h2>{usd(usdTotal)} due {date(inv.issued_at)}</h2>
           {inv.pay_link_url && inv.status !== "paid" && (
             <a className="inv-pay" href={inv.pay_link_url}>
               Pay online
@@ -78,8 +76,6 @@ export default async function InvoicePage({ params }: { params: Promise<{ number
         ) : (
           <p className="inv-tax-note">{SELLER.note}</p>
         )}
-        <p className="inv-fx">Billed in INR. Amounts shown in USD converted at 1 USD = ₹{rate.toFixed(2)}.</p>
-
         <table className="inv-lines">
           <thead>
             <tr>
@@ -107,19 +103,19 @@ export default async function InvoicePage({ params }: { params: Promise<{ number
         <div className="inv-totals">
           <div>
             <span>Subtotal</span>
-            <span>{usd(usdSub)} · {inr(inv.inr_subtotal)}</span>
+            <span>{usd(usdSub)}</span>
           </div>
           <div>
             <span>IGST — INDIA ({gstPct}%)</span>
-            <span>{inr(inv.inr_gst)}</span>
+            <span>{usd(usdGst)}</span>
           </div>
           <div className="inv-total-row">
             <span>Total</span>
-            <span>{inr(inv.inr_total)}</span>
+            <span>{usd(usdTotal)}</span>
           </div>
           <div className="inv-total-row">
             <span>Amount due</span>
-            <span>{inr(inv.inr_total)}</span>
+            <span>{usd(usdTotal)}</span>
           </div>
         </div>
 

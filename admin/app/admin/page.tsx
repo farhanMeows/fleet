@@ -39,6 +39,8 @@ export default function AdminPage() {
 
   const [invUsd, setInvUsd] = useState("");
   const [invName, setInvName] = useState("");
+  const [invAddr, setInvAddr] = useState("");
+  const [invEmail, setInvEmail] = useState("");
   const [invBusy, setInvBusy] = useState(false);
   const [invMsg, setInvMsg] = useState<{ text: string; isErr: boolean } | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -63,13 +65,24 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           usd: Number(invUsd),
-          billTo: invName ? { name: invName, lines: [], email: undefined } : undefined,
+          billTo: invName
+            ? {
+                name: invName,
+                lines: invAddr
+                  .split("\n")
+                  .map((l) => l.trim())
+                  .filter(Boolean),
+                email: invEmail.trim() || undefined,
+              }
+            : undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "failed");
       setInvUsd("");
       setInvName("");
+      setInvAddr("");
+      setInvEmail("");
       setInvMsg({ text: `created ${data.invoice.number}`, isErr: false });
       await loadPayments();
       window.open(`/invoice/${data.invoice.number}`, "_blank");
@@ -233,8 +246,8 @@ export default function AdminPage() {
             className="amount"
             type="number"
             min="1"
-            step="1"
-            placeholder="amount (USD)"
+            step="0.01"
+            placeholder="amount (USD, decimals ok)"
             value={invUsd}
             onChange={(e) => setInvUsd(e.target.value)}
             required
@@ -249,10 +262,27 @@ export default function AdminPage() {
             {invBusy ? "…" : "create invoice →"}
           </button>
         </div>
+        <div className="row">
+          <textarea
+            placeholder={"bill-to address (one line per row)"}
+            value={invAddr}
+            onChange={(e) => setInvAddr(e.target.value)}
+            rows={2}
+            style={{ flex: 2, minWidth: 220, resize: "vertical" }}
+          />
+          <input
+            type="email"
+            placeholder="bill-to email"
+            value={invEmail}
+            onChange={(e) => setInvEmail(e.target.value)}
+            style={{ flex: 1, minWidth: 180 }}
+          />
+        </div>
         {invMsg && <div className={invMsg.isErr ? "err" : "ok"}>{invMsg.text}</div>}
         <div className="hint">
-          USD auto-converts to INR at today&rsquo;s rate; a Razorpay pay-link is attached and GST
-          added. Opens the printable invoice; status flips to paid when the link is settled.
+          Invoice shows USD only (GST added on top); the attached Razorpay pay-link converts to INR
+          at today&rsquo;s rate. Opens the printable invoice; status flips to paid when the link is
+          settled. Address &amp; email print in the invoice&rsquo;s Bill-to block.
         </div>
       </form>
 

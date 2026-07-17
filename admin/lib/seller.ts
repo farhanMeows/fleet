@@ -1,11 +1,7 @@
 // Seller identity printed on invoices.
 export const SELLER = {
   name: "Fleetdeck",
-  addressLines: [
-    "Mission control for Claude Code agents",
-    "Riverside, California",
-    "United States",
-  ],
+  addressLines: ["Riverside, California", "United States"],
   email: "contact@fleetdeck.com",
   // GST registration for non-resident online service providers (rendered as
   // the "GSTIN:" line on invoices). Never put another company's tax id here.

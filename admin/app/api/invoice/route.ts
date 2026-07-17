@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   if (!(await isAuthed())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const usd = Number(body.usd);
+  const usd = round2(Number(body.usd)); // decimals allowed, e.g. 149.99
   if (!Number.isFinite(usd) || usd < 1 || usd > 100000) {
     return NextResponse.json({ error: "amount must be $1 – $100,000" }, { status: 400 });
   }
