@@ -3,7 +3,7 @@ import Razorpay from "razorpay";
 import { isAuthed } from "@/lib/auth";
 import { insertInvoice, nextInvoiceNumber, listInvoices, type BillTo } from "@/lib/db";
 import { usdInr } from "@/lib/fx";
-import { buildLineItems, round2 } from "@/lib/usage";
+import { buildCreditItems, buildLineItems, round2 } from "@/lib/usage";
 import { GST_RATE } from "@/lib/seller";
 
 const DEFAULT_BILL_TO: BillTo = {
@@ -35,7 +35,11 @@ export async function POST(req: NextRequest) {
   const now = new Date();
   const number = await nextInvoiceNumber(now.getUTCFullYear());
   const period = billingPeriod(now);
-  const items = buildLineItems(usd, period, number, { projects });
+  // kind "credits" bills a prepaid top-up; anything else is a usage invoice.
+  const items =
+    body.kind === "credits"
+      ? buildCreditItems(usd)
+      : buildLineItems(usd, period, number, { projects });
 
   const usdSubtotal = round2(items.reduce((a, it) => a + it.qty * it.usdUnit, 0));
   const { rate } = await usdInr();

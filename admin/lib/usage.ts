@@ -75,6 +75,21 @@ export function buildLineItems(
   return items;
 }
 
+// Credit top-up: a single prepaid line. Credits are drawn down as the fleet
+// runs; when the balance hits zero, agent sessions pause until topped up.
+export function buildCreditItems(usdTotal: number): LineItem[] {
+  return [
+    {
+      description: "Fleetdeck credits — top-up",
+      detail:
+        "Prepaid balance applied to agent sessions, active projects & token sync. " +
+        "Drawn down as your fleet runs; service pauses when the balance is exhausted. Never expires.",
+      qty: 1,
+      usdUnit: round2(usdTotal),
+    },
+  ];
+}
+
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }

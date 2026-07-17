@@ -42,6 +42,7 @@ export default function AdminPage() {
   const [invAddr, setInvAddr] = useState("");
   const [invEmail, setInvEmail] = useState("");
   const [invProjects, setInvProjects] = useState("");
+  const [invKind, setInvKind] = useState<"usage" | "credits">("usage");
   const [invBusy, setInvBusy] = useState(false);
   const [invMsg, setInvMsg] = useState<{ text: string; isErr: boolean } | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -68,6 +69,7 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           usd: Number(invUsd),
+          kind: invKind,
           projects: invProjects ? Number(invProjects) : undefined,
           billTo: invName
             ? {
@@ -266,6 +268,14 @@ export default function AdminPage() {
       <form className="panel" onSubmit={createInvoice}>
         <h2>CREATE INVOICE</h2>
         <div className="row">
+          <select
+            value={invKind}
+            onChange={(e) => setInvKind(e.target.value as "usage" | "credits")}
+            title="usage: itemized Pro usage · credits: prepaid top-up for future agent sessions"
+          >
+            <option value="usage">usage invoice</option>
+            <option value="credits">credit top-up</option>
+          </select>
           <span style={{ color: "var(--dim)" }}>$</span>
           <input
             className="amount"
@@ -310,14 +320,18 @@ export default function AdminPage() {
             placeholder="active projects (blank = auto)"
             value={invProjects}
             onChange={(e) => setInvProjects(e.target.value)}
-            style={{ width: 220 }}
+            disabled={invKind === "credits"}
+            title={invKind === "credits" ? "not used for credit top-ups" : undefined}
+            style={{ width: 220, opacity: invKind === "credits" ? 0.4 : 1 }}
           />
         </div>
         {invMsg && <div className={invMsg.isErr ? "err" : "ok"}>{invMsg.text}</div>}
         <div className="hint">
           Invoice shows USD only (GST added on top); the attached Razorpay pay-link converts to INR
           at today&rsquo;s rate. Opens the printable invoice; status flips to paid when the link is
-          settled. Address &amp; email print in the invoice&rsquo;s Bill-to block.
+          settled. Address &amp; email print in the invoice&rsquo;s Bill-to block. Credit top-ups
+          bill a single prepaid line — balance is drawn down by agent sessions and service pauses
+          when it runs out.
         </div>
       </form>
 

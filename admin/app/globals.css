@@ -33,7 +33,7 @@ body {
 }
 .panel h2 { margin: 0 0 14px; font-size: 13px; color: var(--dim); font-weight: 600; letter-spacing: 1px; }
 
-input, textarea, button {
+input, select, textarea, button {
   font: inherit;
   color: var(--text);
   background: var(--bg);
@@ -41,7 +41,7 @@ input, textarea, button {
   padding: 10px 12px;
   outline: none;
 }
-input:focus, textarea:focus { border-color: var(--green); }
+input:focus, select:focus, textarea:focus { border-color: var(--green); }
 input.amount { width: 200px; }
 
 button { cursor: pointer; }
