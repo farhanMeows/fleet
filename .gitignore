@@ -3,8 +3,6 @@ web/node_modules/
 web/dist/
 .DS_Store
 dist/
-website/releases/
-website/install.sh
 admin/node_modules/
 admin/.next/
 admin/next-env.d.ts

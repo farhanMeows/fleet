@@ -155,7 +155,7 @@ termIO.observe(document.getElementById("terminal"));
 // GOOGLE_CLIENT_ID comes from console.cloud.google.com → Credentials →
 // OAuth Client ID (Web) with https://www.fleetdeck.in as authorized origin.
 // While empty, the gate stays hidden and install remains open to everyone.
-const GOOGLE_CLIENT_ID = "";
+const GOOGLE_CLIENT_ID = "967010490410-esda3g39m59poia2c4qadi0mln0loe3c.apps.googleusercontent.com";
 const ACCOUNTS_API = "https://admin.fleetdeck.in/api/auth/google";
 
 const gateEl = document.getElementById("install-gate");
