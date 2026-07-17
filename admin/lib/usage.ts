@@ -60,11 +60,11 @@ export function buildLineItems(usdTotal: number, period: string, seed: string): 
     usdUnit: 3,
   });
 
-  // Reconcile rounding onto the last line so the subtotal is exact.
+  // Reconcile rounding onto the Pro base line: its qty is 1, so adjusting the
+  // unit price is always cent-exact — spreading drift across a qty>1 metered
+  // line can never be (unit prices round to cents, qty multiplies the error).
   const sum = items.reduce((a, it) => a + it.qty * it.usdUnit, 0);
-  const drift = round2(usdTotal - sum);
-  const last = items[items.length - 1];
-  last.usdUnit = round2(last.usdUnit + drift / last.qty);
+  items[0].usdUnit = round2(items[0].usdUnit + (usdTotal - sum));
   return items;
 }
 

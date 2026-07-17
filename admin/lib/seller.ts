@@ -2,7 +2,7 @@
 export const SELLER = {
   name: "Fleetdeck",
   addressLines: ["Riverside, California", "United States"],
-  email: "contact@fleetdeck.com",
+  email: "contact@fleetdeck.in",
   // GST registration for non-resident online service providers (rendered as
   // the "GSTIN:" line on invoices). Never put another company's tax id here.
   gstin: "9935USA34043OS5",
