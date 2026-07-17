@@ -44,6 +44,8 @@ export default function AdminPage() {
   const [invBusy, setInvBusy] = useState(false);
   const [invMsg, setInvMsg] = useState<{ text: string; isErr: boolean } | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<{ text: string; isErr: boolean } | null>(null);
 
   const loadPayments = useCallback(async () => {
     const res = await fetch("/api/payments");
@@ -90,6 +92,26 @@ export default function AdminPage() {
       setInvMsg({ text: err instanceof Error ? err.message : "failed", isErr: true });
     } finally {
       setInvBusy(false);
+    }
+  }
+
+  async function syncRazorpay() {
+    setSyncMsg(null);
+    setSyncBusy(true);
+    try {
+      const res = await fetch("/api/reconcile", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "sync failed");
+      const errs = data.errors?.length ? ` · ${data.errors.length} lookup(s) failed` : "";
+      setSyncMsg({
+        text: `synced — ${data.invoicesPaid} invoice(s) marked paid, ${data.paymentsUpdated} payment(s) updated${errs}`,
+        isErr: false,
+      });
+      await loadPayments();
+    } catch (err) {
+      setSyncMsg({ text: err instanceof Error ? err.message : "sync failed", isErr: true });
+    } finally {
+      setSyncBusy(false);
     }
   }
 
@@ -287,7 +309,13 @@ export default function AdminPage() {
       </form>
 
       <div className="panel">
-        <h2>INVOICES</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <h2>INVOICES</h2>
+          <button onClick={syncRazorpay} disabled={syncBusy} title="Re-check pending invoices & payments against Razorpay">
+            {syncBusy ? "syncing…" : "sync with razorpay"}
+          </button>
+        </div>
+        {syncMsg && <div className={syncMsg.isErr ? "err" : "ok"}>{syncMsg.text}</div>}
         {invoices.length === 0 ? (
           <div className="hint">no invoices yet</div>
         ) : (
