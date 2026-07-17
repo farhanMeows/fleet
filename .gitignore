@@ -6,3 +6,4 @@ dist/
 admin/node_modules/
 admin/.next/
 admin/next-env.d.ts
+admin/.env*
