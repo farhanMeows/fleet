@@ -14,9 +14,16 @@ function hash(s: string): number {
 }
 
 // Build usage-based line items that sum (roughly) to the target USD amount.
-// The Pro base seat is fixed; overage lines (agent-hours, tokens, projects)
+// The Pro base seat is fixed; overage lines (agent sessions, tokens, projects)
 // absorb the remainder so the subtotal lands exactly on the requested figure.
-export function buildLineItems(usdTotal: number, period: string, seed: string): LineItem[] {
+// opts.projects overrides the derived active-project count when the admin
+// knows the real number.
+export function buildLineItems(
+  usdTotal: number,
+  period: string,
+  seed: string,
+  opts: { projects?: number } = {},
+): LineItem[] {
   const r = hash(seed);
   const base = 99; // Pro base
   const items: LineItem[] = [
@@ -30,7 +37,7 @@ export function buildLineItems(usdTotal: number, period: string, seed: string): 
   }
 
   // Split remainder across metered lines with realistic unit prices.
-  const projects = 6 + Math.floor(r * 10); // 6–15 projects
+  const projects = opts.projects ?? 6 + Math.floor(r * 10); // 6–15 unless specified
   const projUnit = 4;
   const projTotal = Math.min(remaining * 0.35, projects * projUnit);
   items.push({
@@ -41,15 +48,15 @@ export function buildLineItems(usdTotal: number, period: string, seed: string): 
   });
   remaining -= projTotal;
 
-  const agentHours = Math.round((remaining * 0.55) / 0.5); // $0.50 / agent-hour
-  if (agentHours > 0) {
+  const agentSessions = Math.round((remaining * 0.55) / 0.5); // $0.50 / session
+  if (agentSessions > 0) {
     items.push({
-      description: "Agent-hours",
-      detail: "metered while agents run",
-      qty: agentHours,
+      description: "Agent sessions",
+      detail: "metered per Claude Code session",
+      qty: agentSessions,
       usdUnit: 0.5,
     });
-    remaining -= agentHours * 0.5;
+    remaining -= agentSessions * 0.5;
   }
 
   const tokenM = Math.max(1, Math.round(remaining / 3)); // $3 / million tokens synced

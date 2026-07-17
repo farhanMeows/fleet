@@ -28,10 +28,14 @@ export async function POST(req: NextRequest) {
   const withLink = body.paymentLink !== false; // default: attach a Razorpay link
   const billTo: BillTo = body.billTo?.name ? body.billTo : DEFAULT_BILL_TO;
 
+  // Optional real active-project count for the "Active projects" line.
+  const projectsRaw = Math.trunc(Number(body.projects));
+  const projects = projectsRaw >= 1 && projectsRaw <= 999 ? projectsRaw : undefined;
+
   const now = new Date();
   const number = await nextInvoiceNumber(now.getUTCFullYear());
   const period = billingPeriod(now);
-  const items = buildLineItems(usd, period, number);
+  const items = buildLineItems(usd, period, number, { projects });
 
   const usdSubtotal = round2(items.reduce((a, it) => a + it.qty * it.usdUnit, 0));
   const { rate } = await usdInr();

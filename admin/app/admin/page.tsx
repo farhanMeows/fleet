@@ -41,6 +41,7 @@ export default function AdminPage() {
   const [invName, setInvName] = useState("");
   const [invAddr, setInvAddr] = useState("");
   const [invEmail, setInvEmail] = useState("");
+  const [invProjects, setInvProjects] = useState("");
   const [invBusy, setInvBusy] = useState(false);
   const [invMsg, setInvMsg] = useState<{ text: string; isErr: boolean } | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -67,6 +68,7 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           usd: Number(invUsd),
+          projects: invProjects ? Number(invProjects) : undefined,
           billTo: invName
             ? {
                 name: invName,
@@ -85,6 +87,7 @@ export default function AdminPage() {
       setInvName("");
       setInvAddr("");
       setInvEmail("");
+      setInvProjects("");
       setInvMsg({ text: `created ${data.invoice.number}`, isErr: false });
       await loadPayments();
       window.open(`/invoice/${data.invoice.number}`, "_blank");
@@ -298,6 +301,16 @@ export default function AdminPage() {
             value={invEmail}
             onChange={(e) => setInvEmail(e.target.value)}
             style={{ flex: 1, minWidth: 180 }}
+          />
+          <input
+            type="number"
+            min="1"
+            max="999"
+            step="1"
+            placeholder="active projects (blank = auto)"
+            value={invProjects}
+            onChange={(e) => setInvProjects(e.target.value)}
+            style={{ width: 220 }}
           />
         </div>
         {invMsg && <div className={invMsg.isErr ? "err" : "ok"}>{invMsg.text}</div>}
