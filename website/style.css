@@ -458,3 +458,14 @@ a:hover { color: var(--cyan); }
 .install-signed { color: var(--ink-faint); font-size: 13px; margin: 0 0 18px; }
 .install-signed b { color: var(--ink-dim); font-weight: 600; }
 .install-signed a { color: var(--ink-faint); }
+
+/* badge sits half-outside the card border — needs visible overflow */
+.price-card { overflow: visible; }
+.price-card::before { border-radius: var(--r); }
+
+/* pulse the sign-in gate when an install CTA is clicked while logged out */
+.install-gate.attn { animation: gate-attn 1.2s ease 2; }
+@keyframes gate-attn {
+  0%, 100% { border-color: var(--line); box-shadow: none; }
+  50% { border-color: rgba(52, 211, 153, 0.65); box-shadow: 0 0 32px rgba(52, 211, 153, 0.25); }
+}

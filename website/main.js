@@ -221,3 +221,15 @@ document.getElementById("sign-out")?.addEventListener("click", (e) => {
 });
 
 initGate();
+
+// Any install CTA clicked while logged out: scroll lands on the gate —
+// actively ask for the account (Google One Tap) and pulse the gate.
+document.querySelectorAll('a[href="#install"]').forEach((a) => {
+  a.addEventListener("click", () => {
+    if (!GOOGLE_CLIENT_ID || currentUser()) return;
+    gateEl.classList.remove("attn");
+    void gateEl.offsetWidth; // restart animation
+    gateEl.classList.add("attn");
+    if (window.google?.accounts?.id) google.accounts.id.prompt();
+  });
+});
