@@ -56,7 +56,13 @@
 }
 
 @media print {
-  .inv-page { background: #fff; padding: 0; }
+  /* The admin's dark theme (globals.css) paints html/body near-black; the
+     white invoice card only spans its own height, so any overflow onto page 2
+     printed black. Force white everywhere in print. */
+  html, body { background: #fff !important; }
+  .inv-page { background: #fff; padding: 0; min-height: 0; }
   .inv { box-shadow: none; max-width: none; padding: 40px; }
   .no-print { display: none !important; }
+  /* Keep rows and blocks from being sliced across pages. */
+  .inv-lines tr, .inv-totals, .inv-parties, .inv-meta, .inv-foot { break-inside: avoid; }
 }
