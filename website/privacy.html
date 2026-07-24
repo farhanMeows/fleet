@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — fleetdeck</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="bg" aria-hidden="true">
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-noise"></div>
+</div>
+
+<header class="nav scrolled" id="nav">
+  <div class="nav-inner">
+    <a class="brand" href="./">
+      <svg class="brand-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="2" width="9" height="9" rx="2" fill="url(#g1)"/>
+        <rect x="13" y="2" width="9" height="9" rx="2" fill="url(#g1)" opacity=".55"/>
+        <rect x="2" y="13" width="9" height="9" rx="2" fill="url(#g1)" opacity=".55"/>
+        <rect x="13" y="13" width="9" height="9" rx="2" fill="url(#g1)" opacity=".25"/>
+        <defs><linearGradient id="g1" x1="2" y1="2" x2="22" y2="22"><stop stop-color="#7c8cf8"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+      </svg>
+      fleetdeck
+    </a>
+    <nav class="nav-links"><a href="./">← Back to home</a></nav>
+  </div>
+</header>
+
+<main class="legal container">
+  <h1>Privacy Policy</h1>
+  <p class="legal-updated">Last updated: July 24, 2026</p>
+
+  <h2>1. The short version</h2>
+  <p>The fleet tool is local-first: your agents' events, transcripts, and project data stay in
+  SQLite on your machine (<code>~/.fleet/</code>) and are never sent to us. What we hold is the
+  minimum needed to run accounts and billing: your Google account basics and your invoice and
+  payment records.</p>
+
+  <h2>2. What we collect</h2>
+  <ul>
+    <li><b>Account:</b> when you sign in with Google we receive your name, email address, and
+    Google account ID, and we record sign-in counts and timestamps.</li>
+    <li><b>Billing:</b> invoices we issue to you (amounts, line items, status) and payment
+    references from Razorpay (order, payment, and payment-link IDs). Card, UPI, and bank details
+    are handled entirely by Razorpay — we never see or store them.</li>
+    <li><b>Website:</b> your sign-in session is kept in your browser's localStorage. We do not
+    run advertising trackers or analytics cookies.</li>
+    <li><b>Software:</b> the fleet CLI sends no telemetry. Your code, prompts, and agent activity
+    never leave your machine unless you enable a cloud feature that explicitly says so.</li>
+  </ul>
+
+  <h2>3. How we use it</h2>
+  <p>To authenticate downloads, issue and settle invoices, provide support, notify you about
+  releases and account matters, and satisfy tax and accounting obligations (including GST
+  invoicing). We do not sell or rent personal data.</p>
+
+  <h2>4. Who we share it with</h2>
+  <p>Only service providers needed to operate: Google (sign-in), Razorpay (payments), Vercel
+  (hosting), and our database provider (Aiven). Each receives only what its function requires.
+  We may disclose information if legally compelled.</p>
+
+  <h2>5. Retention and deletion</h2>
+  <p>Account data is kept while your account is active. Invoice and payment records are kept as
+  long as tax law requires. To delete your account and associated personal data (except records
+  we must retain), email <a href="mailto:contact@fleetdeck.in">contact@fleetdeck.in</a> from your
+  registered address — we will confirm within 7 days.</p>
+
+  <h2>6. Security</h2>
+  <p>Data in transit is encrypted with TLS. Download access is authorised with signed, expiring
+  tokens. Payment collection happens on Razorpay's PCI-DSS-compliant infrastructure.</p>
+
+  <h2>7. Changes and contact</h2>
+  <p>We may update this policy; the date above reflects the current version. Questions or
+  requests: <a href="mailto:contact@fleetdeck.in">contact@fleetdeck.in</a> — Fleetdeck,
+  Riverside, California, United States.</p>
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <span class="footer-brand">fleetdeck</span>
+    <span class="t-dim">mission control for Claude Code agents</span>
+  </div>
+  <div class="container footer-links">
+    <a href="terms.html">Terms &amp; Conditions</a>
+    <a href="privacy.html">Privacy Policy</a>
+    <a href="refunds.html">Refund Policy</a>
+    <a href="cancellation.html">Cancellation Policy</a>
+    <a href="mailto:contact@fleetdeck.in">Contact</a>
+  </div>
+</footer>
+
+</body>
+</html>
